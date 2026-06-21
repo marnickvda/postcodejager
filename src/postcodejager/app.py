@@ -2,7 +2,7 @@
 import pathlib
 import time
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (
     FileResponse,
@@ -135,7 +135,7 @@ def create_app(
         return {"planned": []}
 
     @app.post("/api/route/auto")
-    def route_auto():
+    def route_auto(loop: bool = Body(True, embed=True)):
         idx = index_provider()
         planned = [c for c in store.get_planned() if c in idx.codes()]
         if len(planned) < 2:
@@ -143,12 +143,15 @@ def create_app(
                 status_code=400,
                 detail="Selecteer minstens 2 postcodes voor een route",
             )
-        ordered = planning_mod.order_nearest_neighbour(
-            [idx.centroid(c) for c in planned]
+        # Order the centroids into a smooth tour (nearest-neighbour + 2-opt),
+        # and close the loop back to the start when requested.
+        ordered = planning_mod.plan_order(
+            [idx.centroid(c) for c in planned], loop=loop
         )
+        waypoints = ordered + ([ordered[0]] if loop else [])
         try:
             result = routing_mod.route(
-                ordered,
+                waypoints,
                 base_url=settings.brouter_base_url,
                 profile=settings.brouter_profile,
             )

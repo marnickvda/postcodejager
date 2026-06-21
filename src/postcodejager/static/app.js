@@ -309,7 +309,11 @@ async function computeRoute() {
   btn.disabled = true;
   btn.textContent = "Bezig…";
   try {
-    const res = await fetch("/api/route/auto", { method: "POST" });
+    const res = await fetch("/api/route/auto", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ loop: document.getElementById("loop-toggle").checked }),
+    });
     if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
     const data = await res.json();
     if (routeLayer) map.removeLayer(routeLayer);

@@ -16,8 +16,9 @@ BROUTER_GEOJSON = {
             "type": "Feature",
             "properties": {"track-length": "3500", "filtered ascend": "5"},
             "geometry": {
+                # BRouter emits 3D coords: [lon, lat, elevation].
                 "type": "LineString",
-                "coordinates": [[4.905, 52.37], [4.935, 52.37]],
+                "coordinates": [[4.905, 52.37, 1.0], [4.935, 52.37, 2.0]],
             },
         }
     ],

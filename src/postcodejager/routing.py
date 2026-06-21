@@ -38,7 +38,8 @@ def route(
     data = resp.json()
     feature = data["features"][0]
     coords = feature["geometry"]["coordinates"]
-    points = [(lat, lon) for lon, lat in coords]
+    # BRouter returns [lon, lat] or [lon, lat, elevation]; keep lon/lat only.
+    points = [(c[1], c[0]) for c in coords]
     distance_m = float(feature["properties"].get("track-length", 0))
     return Route(points=points, distance_m=distance_m)
 

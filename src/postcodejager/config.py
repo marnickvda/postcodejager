@@ -1,5 +1,6 @@
 """Application settings, loaded from environment with sensible defaults."""
 import os
+import pathlib
 from dataclasses import dataclass
 
 # CBS PC4 areas (CC BY 4.0), served as GeoJSON via the Opendatasoft Explore API.
@@ -7,6 +8,23 @@ DEFAULT_PC4_URL = (
     "https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/"
     "georef-netherlands-postcode-pc4/exports/geojson"
 )
+
+
+def apply_dotenv(path: str = ".env") -> None:
+    """Load ``KEY=VALUE`` lines from a .env file into os.environ.
+
+    Existing environment variables win (``setdefault``). Used by the run
+    entrypoints; tests stay hermetic by not calling this.
+    """
+    p = pathlib.Path(path)
+    if not p.exists():
+        return
+    for line in p.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
 
 
 @dataclass

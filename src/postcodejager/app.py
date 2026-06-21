@@ -3,6 +3,7 @@ import pathlib
 import time
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -15,8 +16,9 @@ from .storage import Store
 from .strava import StravaClient, build_authorize_url
 
 STATIC_DIR = pathlib.Path(__file__).parent / "static"
-# Degrees of geometry simplification for the display layer (~30 m).
-DISPLAY_SIMPLIFY = 0.0003
+# Degrees of geometry simplification for the display layer (~100 m). Keeps the
+# (gzipped) PC4 payload light; membership is still computed at full resolution.
+DISPLAY_SIMPLIFY = 0.001
 
 
 class RouteRequest(BaseModel):
@@ -35,6 +37,7 @@ def create_app(
     strava_client: StravaClient | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Postcodejager")
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
     strava = strava_client or StravaClient(
         settings.strava_client_id, settings.strava_client_secret

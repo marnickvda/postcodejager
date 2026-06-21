@@ -2,9 +2,82 @@
 <html lang="nl">
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Postcodejager</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
-    <p>Postcodejager — frontend volgt in Task 11.</p>
+    <aside id="sidebar">
+      <header class="brand">
+        <h1>Postcodejager <span aria-hidden="true">🧡</span></h1>
+        <p class="tagline">Vink nieuwe postcodes af op de racefiets.</p>
+      </header>
+
+      <section class="card">
+        <div class="row">
+          <span class="label">Strava</span>
+          <span id="conn-status" class="pill pill-off">niet verbonden</span>
+        </div>
+        <a id="connect-btn" class="btn btn-strava" href="/auth/login">Verbind met Strava</a>
+        <button id="sync-btn" class="btn" type="button">Synchroniseer ritten</button>
+      </section>
+
+      <section class="card stats">
+        <div class="stat">
+          <span id="collected-count" class="stat-value">–</span>
+          <span class="stat-label">afgevinkt</span>
+        </div>
+        <div class="stat">
+          <span id="last-sync" class="stat-value">–</span>
+          <span class="stat-label">laatste sync</span>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="row">
+          <span class="label">Route plannen</span>
+          <span id="wp-count" class="muted">0 punten</span>
+        </div>
+        <p class="hint">Klik op de kaart om waypoints te plaatsen. Sleep om te verschuiven.</p>
+        <div class="btn-grid">
+          <button id="route-btn" class="btn" type="button">Bereken route</button>
+          <button id="clear-btn" class="btn btn-ghost" type="button">Wis punten</button>
+        </div>
+        <div id="route-result" class="result hidden">
+          <div class="row">
+            <span class="label">Afstand</span><span id="route-distance">–</span>
+          </div>
+          <div class="row">
+            <span class="label">Nieuwe postcodes</span>
+            <span id="route-new" class="pill pill-new">–</span>
+          </div>
+          <button id="export-btn" class="btn btn-primary" type="button">
+            Exporteer GPX
+          </button>
+        </div>
+      </section>
+
+      <p id="message" class="message hidden"></p>
+
+      <footer class="attribution">
+        Data: CBS PC4 (CC BY 4.0) · © OpenStreetMap-bijdragers · routing BRouter ·
+        activiteiten via Strava.
+      </footer>
+    </aside>
+
+    <main id="map"></main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="/static/app.js"></script>
   </body>
 </html>

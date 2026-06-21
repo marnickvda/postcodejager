@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "postcodejager"
+version = "0.1.0"
+description = "Plan efficient road-bike routes to complete the PostNL Postcode Challenge."
+requires-python = ">=3.11"
+dependencies = [
+    "shapely>=2.0",
+    "httpx>=0.27",
+    "polyline>=2.0",
+    "gpxpy>=1.6",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "respx>=0.21",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

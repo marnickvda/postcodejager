@@ -269,6 +269,30 @@ function refreshSelectionUI() {
     li.append(label, btn);
     list.appendChild(li);
   }
+  updateImpact();
+}
+
+// How much would completing the current selection raise your percentage —
+// overall and per affected province.
+async function updateImpact() {
+  const box = document.getElementById("impact");
+  if (!selectedSet.size) {
+    box.classList.add("hidden");
+    return;
+  }
+  const d = await (await fetch("/api/selection/impact")).json();
+  if (!d.new) {
+    box.classList.add("hidden");
+    return;
+  }
+  const fmt = (n) =>
+    n.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  box.querySelector(".impact-main").textContent =
+    `+${fmt(d.increase)}% — van ${fmt(d.current_percent)}% naar ${fmt(d.projected_percent)}%`;
+  box.querySelector(".impact-provs").textContent = d.provinces
+    .map((p) => `${p.name} +${fmt(p.increase)}%`)
+    .join(" · ");
+  box.classList.remove("hidden");
 }
 
 // The server owns the planned set; we sync our local copy from its response.

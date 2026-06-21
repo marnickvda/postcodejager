@@ -375,6 +375,26 @@ body {
   gap: 8px;
 }
 
+.impact {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.impact-main {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--orange-dark);
+}
+
+.impact-provs {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .message {
   font-size: 13px;
   padding: 10px 12px;

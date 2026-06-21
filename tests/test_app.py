@@ -64,6 +64,21 @@ def test_provinces_endpoint(tmp_path):
     assert by["Utrecht"]["percent"] == 0.0
 
 
+def test_selection_impact(tmp_path):
+    c, store = make(tmp_path)  # fixture: 1011 Noord-Holland, 1012 Utrecht (total 2)
+    store.set_collected({"1011"})  # currently 50%
+    store.set_planned({"1012"})  # selecting the other would reach 100%
+    body = c.get("/api/selection/impact").json()
+    assert body["new"] == 1
+    assert body["current_percent"] == 50.0
+    assert body["projected_percent"] == 100.0
+    assert body["increase"] == 50.0
+    provs = {p["name"]: p for p in body["provinces"]}
+    assert provs["Utrecht"]["new"] == 1
+    assert provs["Utrecht"]["increase"] == 100.0
+    assert "Noord-Holland" not in provs  # already collected, nothing new
+
+
 def test_geometry_endpoint_is_cacheable(tmp_path):
     c, _ = make(tmp_path)
     r = c.get("/api/pc4/geometry")

@@ -150,6 +150,35 @@ def create_app(
         rows.sort(key=lambda r: r["name"])
         return {"provinces": rows}
 
+    @app.get("/api/selection/impact")
+    def selection_impact():
+        idx = index_provider()
+        valid = store.get_planned() & idx.codes()
+        collected = store.get_collected()
+        new = valid - collected  # selected postcodes not yet collected
+        total = len(idx.codes())
+        provinces = []
+        for name, codes in idx.codes_by_province().items():
+            prov_new = len(codes & new)
+            if prov_new:
+                provinces.append(
+                    {
+                        "name": name,
+                        "new": prov_new,
+                        "total": len(codes),
+                        "increase": round(prov_new / len(codes) * 100, 1),
+                    }
+                )
+        provinces.sort(key=lambda p: -p["increase"])
+        pct = lambda n: round(n / total * 100, 1) if total else 0.0  # noqa: E731
+        return {
+            "new": len(new),
+            "current_percent": pct(len(collected)),
+            "projected_percent": pct(len(collected) + len(new)),
+            "increase": pct(len(new)),
+            "provinces": provinces,
+        }
+
     # --- planned selection (postcodes to include in the next route) -------
     @app.get("/api/planned")
     def planned():

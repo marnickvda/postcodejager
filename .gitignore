@@ -14,3 +14,9 @@ deploy/tofu/.terraform/
 deploy/tofu/*.tfstate
 deploy/tofu/*.tfstate.*
 deploy/tofu/terraform.tfvars
+
+# AI process artifacts — kept locally, never published
+.impeccable/
+docs/superpowers/
+tasks/
+PRODUCT.md

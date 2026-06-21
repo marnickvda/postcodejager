@@ -1,14 +1,31 @@
 # Postcodejager 🧡
 
-Een lokale tool om de **PostNL Postcode Challenge** efficiënt af te vinken op de
+Een tool om de **PostNL Postcode Challenge** efficiënt af te vinken op de
 racefiets. Hij leidt uit je Strava-ritten af welke van de ~4.000 PC4-postcode­
 gebieden je al hebt gehad, toont ze op een kaart, helpt een route over verharde
 fietspaden/wegen (geen gravel) te plannen die veel nieuwe postcodes pakt, en
 exporteert een neutrale GPX voor je fietscomputer.
 
-Alles draait lokaal op `localhost`; je Strava-tokens blijven op je eigen machine.
+**Local-first:** al je data — je Strava-token, afgevinkte postcodes en je
+selectie — leeft in **localStorage in je browser**. De backend is **stateless**:
+hij doet alleen het rekenwerk dat Python/kaartdata/het Strava-secret nodig heeft
+(token-uitwisseling, ritten ophalen, matchen, routeren, GPX). Hij slaat niets op,
+dus er is geen database en geen login nodig.
 
-## Installatie
+## Wat het doet
+
+- **Voortgang** uit Strava: afgevinkt (groen) vs. open (grijs), met percentage en
+  een uitklapbare **per-provincie**-stand.
+- **Selecteren**: klik postcodes, of houd **Shift** ingedrukt en sleep een kader
+  om een heel gebied in één keer te pakken. Selectie blijft bewaard tussen sessies.
+- **Impact**: zie live hoeveel procent je selectie zou opleveren (totaal + per
+  provincie).
+- **Route**: de tool ordent de selectie (nearest-neighbour + 2-opt) en routeert er
+  via BRouter doorheen over verharde wegen/fietspaden, als rondrit of punt-naar-punt.
+- **GPX**: exporteer de route, of **importeer** een GPX om meteen te zien hoeveel
+  nieuwe postcodes hij pakt.
+
+## Lokaal draaien
 
 Vereist Python 3.11+.
 
@@ -17,43 +34,21 @@ python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 ```
 
-## Strava-app aanmaken
+**Strava-app:** maak er een aan op <https://www.strava.com/settings/api>, zet de
+**Authorization Callback Domain** op `localhost`, kopieer `.env.example` naar
+`.env` en vul `STRAVA_CLIENT_ID` + `STRAVA_CLIENT_SECRET` in.
 
-1. Ga naar <https://www.strava.com/settings/api> en maak een API-applicatie.
-2. Zet **Authorization Callback Domain** op `localhost`.
-3. Kopieer `.env.example` naar `.env` en vul in:
-
-```bash
-cp .env.example .env
-# vul STRAVA_CLIENT_ID en STRAVA_CLIENT_SECRET in
-```
-
-## Postcodedata ophalen
+**Postcodedata** (CBS PC4-grenzen, CC BY 4.0 → `data/pc4.geojson`):
 
 ```bash
 .venv/bin/python scripts/fetch_pc4.py
 ```
 
-Dit downloadt de CBS PC4-grenzen (CC BY 4.0) naar `data/pc4.geojson`
-(~4.000 gebieden).
-
-## Starten
+**Starten:**
 
 ```bash
-.venv/bin/python -m postcodejager
+.venv/bin/python -m postcodejager   # -> http://localhost:8000
 ```
-
-Open <http://localhost:8000>:
-
-1. **Verbind met Strava** — daarna synchroniseert de tool je ritten automatisch
-   op de achtergrond en berekent welke PC4-gebieden je al hebt gehad (groen) en
-   welke nog open zijn (grijs). Het ↻-knopje ververst handmatig.
-2. **Klik postcodes** op de kaart om ze mee te nemen in je route (oranje + ✓).
-   Nog eens klikken haalt ze weg; de selectie blijft bewaard tussen sessies.
-3. **Bereken route** — de tool kiest zelf een volgorde langs alle geselecteerde
-   postcodes en routeert er via BRouter doorheen over verharde wegen/fietspaden;
-   het toont de afstand plus het aantal nieuwe postcodes dat de route raakt.
-4. **Exporteer GPX**.
 
 ## GPX op je fietscomputer
 
@@ -70,20 +65,20 @@ De GPX is neutraal en werkt voor beide routes:
 .venv/bin/pytest
 ```
 
+## Deployen
+
+Productie-opzet (Hetzner + OpenTofu + Ansible + GitHub Actions, met automatische
+HTTPS en deploy bij elke push naar `main`) staat in **[`deploy/README.md`](deploy/README.md)**.
+Omdat de backend stateless is, is er geen database om te bewaren.
+
 ## Routing-engine
 
-Standaard gebruikt de tool de publieke [BRouter](https://brouter.de)-server met
-het `trekking`-profiel. Voor intensief gebruik of een racefiets-specifiek
-profiel (verhard, gravel vermijden) kun je BRouter zelf hosten en
-`BROUTER_BASE_URL` / `BROUTER_PROFILE` in `.env` aanpassen.
+Standaard de publieke [BRouter](https://brouter.de)-server met het
+`trekking`-profiel. Zelf hosten of een ander profiel kan via `BROUTER_BASE_URL` /
+`BROUTER_PROFILE` in `.env`.
 
 ## Databronnen & attributie
 
 - Postcodegrenzen: **CBS PC4** via PDOK/Opendatasoft — CC BY 4.0
 - Routing: **BRouter** op **OpenStreetMap**-data
 - Activiteiten: **Strava** (scope `activity:read_all`, alleen je eigen data)
-
-## Status
-
-Fase 1 (MVP). De automatische **suggestie-engine** (cluster van open postcodes
-voorstellen) volgt in fase 2 — zie `docs/superpowers/plans/`.

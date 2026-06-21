@@ -8,6 +8,7 @@ rides, routing, and GPX. It stores nothing.
 import logging
 import pathlib
 import threading
+import time
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
@@ -67,10 +68,42 @@ class TrackRequest(BaseModel):
     name: str = "Postcodejager route"
 
 
-def create_app(settings: Settings, index_provider, strava_client=None) -> FastAPI:
+def create_app(
+    settings: Settings,
+    index_provider,
+    strava_client=None,
+    rate_limit: int = 120,
+    rate_window: int = 60,
+) -> FastAPI:
     app = FastAPI(title="Postcodejager")
     app.add_middleware(GZipMiddleware, minimum_size=1000)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    # Simple per-IP rate limit on the API to curb abuse of the Strava/BRouter
+    # proxying (in-memory; honours X-Forwarded-For behind the Caddy proxy).
+    hits: dict[str, list[float]] = {}
+
+    @app.middleware("http")
+    async def _rate_limit(request: Request, call_next):
+        if request.url.path.startswith("/api/"):
+            fwd = request.headers.get("x-forwarded-for")
+            ip = (
+                fwd.split(",")[0].strip()
+                if fwd
+                else (request.client.host if request.client else "?")
+            )
+            now = time.time()
+            cutoff = now - rate_window
+            q = hits.setdefault(ip, [])
+            while q and q[0] < cutoff:
+                q.pop(0)
+            if len(q) >= rate_limit:
+                return JSONResponse(
+                    {"detail": "Te veel verzoeken. Probeer het zo opnieuw."},
+                    status_code=429,
+                )
+            q.append(now)
+        return await call_next(request)
     strava = strava_client or StravaClient(
         settings.strava_client_id, settings.strava_client_secret
     )

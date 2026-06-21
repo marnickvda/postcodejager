@@ -135,6 +135,15 @@ def test_strava_exchange():
     assert r.json()["access_token"] == "AT"
 
 
+def test_rate_limit_blocks_excess():
+    idx = PC4Index.from_geojson(json.loads(FIX.read_text()))
+    settings = load_settings({"BROUTER_BASE_URL": "https://brouter.test/brouter"})
+    c = TestClient(create_app(settings, lambda: idx, rate_limit=3))
+    for _ in range(3):
+        assert c.post("/api/provinces", json={"collected": []}).status_code == 200
+    assert c.post("/api/provinces", json={"collected": []}).status_code == 429
+
+
 def test_sync_computes_collected():
     poly = polyline.encode([(52.37, 4.905), (52.37, 4.935)])
     page1 = [

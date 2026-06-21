@@ -58,11 +58,17 @@ resource "hcloud_server" "app" {
   }
 }
 
-# DNS A-record in your existing Hetzner DNS zone, managed via the same Hetzner
-# Cloud token (DNS is part of the Cloud API since provider v1.56). The zone must
-# already exist in Hetzner DNS; "@" as name targets the apex.
+# Hetzner DNS zone (managed via the same Hetzner Cloud token; DNS is part of the
+# Cloud API since provider v1.56). Delegate your domain to Hetzner by setting the
+# `nameservers` output at your registrar (TransIP).
+resource "hcloud_zone" "main" {
+  name = var.dns_zone
+  mode = "primary"
+}
+
+# A-record pointing the host at the server. "@" as name targets the apex.
 resource "hcloud_zone_rrset" "app" {
-  zone    = var.dns_zone
+  zone    = hcloud_zone.main.name
   name    = var.subdomain
   type    = "A"
   ttl     = 300

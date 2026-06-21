@@ -75,20 +75,18 @@
         state: absent
       when: not app_git.stat.exists
 
-    # The first deploy chowns the tree to {{ app_user }} ("Own the app dir"),
-    # after which root's git refuses to touch it (CVE-2022-24765 "dubious
-    # ownership"). Mark it safe for root before the clone/update runs.
-    - name: Read root's git safe.directory entries
-      ansible.builtin.command:
-        cmd: git config --global --get-all safe.directory
-      register: git_safe_dirs
-      changed_when: false
-      failed_when: false
-
-    - name: Trust the app dir for root's git
-      ansible.builtin.command:
-        cmd: git config --global --add safe.directory {{ app_dir }}
-      when: app_dir not in git_safe_dirs.stdout_lines
+    # Keep the repo root-owned so root's git can update it without tripping the
+    # "dubious ownership" guard (CVE-2022-24765) — never trust an app-user-owned
+    # repo as root, since planted hooks would then run as root on deploy. An
+    # earlier release chowned the whole tree to {{ app_user }}; reclaim it for
+    # root here (idempotent; a no-op once root-owned). The app only reads code.
+    - name: Ensure root owns the app dir so its git is safe to update
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        owner: root
+        group: root
+        recurse: true
+      when: app_git.stat.exists
 
     - name: Clone or update the repo
       ansible.builtin.git:
@@ -128,9 +126,13 @@
         chdir: "{{ app_dir }}"
         creates: "{{ app_dir }}/data/pc4.geojson"
 
-    - name: Own the app dir
+    # Code, venv and .env stay root-owned: the service only reads them and
+    # systemd loads EnvironmentFile as root. The app writes nothing today, but
+    # give it sole ownership of data/ so it can persist there without ever
+    # owning anything root re-executes on the next deploy.
+    - name: Let the app own only its data dir
       ansible.builtin.file:
-        path: "{{ app_dir }}"
+        path: "{{ app_dir }}/data"
         owner: "{{ app_user }}"
         group: "{{ app_user }}"
         recurse: true

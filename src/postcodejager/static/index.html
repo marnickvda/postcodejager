@@ -16,21 +16,16 @@
   <body>
     <aside id="sidebar">
       <header class="brand">
-        <h1><img class="brand-icon" src="/static/icon.svg" alt="" width="26" height="26" />Postcodejager</h1>
-        <p class="tagline">Vink nieuwe postcodes af op de racefiets.</p>
-      </header>
-
-      <section class="card">
-        <div class="row">
-          <span class="label">Strava</span>
+        <div class="brand-top">
+          <h1><img class="brand-icon" src="/static/icon.svg" alt="" width="26" height="26" />Postcodejager</h1>
           <span class="strava-status">
             <span id="conn-status" class="pill pill-off">niet verbonden</span>
             <button id="refresh-btn" class="icon-btn hidden" type="button"
               title="Ritten verversen" aria-label="Ritten verversen">↻</button>
           </span>
         </div>
-        <a id="connect-btn" class="btn btn-strava" href="/auth/login">Verbind met Strava</a>
-      </section>
+        <p class="tagline">Vink nieuwe postcodes af op de racefiets.</p>
+      </header>
 
       <section class="card">
         <div class="row">

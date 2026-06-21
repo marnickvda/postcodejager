@@ -66,6 +66,13 @@ body {
   flex: 0 0 auto;
 }
 
+.brand-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .tagline {
   margin: 4px 0 0;
   color: var(--muted);
@@ -520,6 +527,116 @@ kbd {
   accent-color: var(--orange);
   width: 16px;
   height: 16px;
+}
+
+/* First-run welcome overlay (shown over the map until Strava is connected). */
+.welcome {
+  position: absolute;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(238, 240, 243, 0.72);
+}
+
+.welcome.hidden {
+  display: none;
+}
+
+.welcome-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(20, 23, 28, 0.15);
+  padding: 28px;
+  max-width: 380px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.welcome-card h2 {
+  margin: 4px 0 0;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+.welcome-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.welcome-card .btn-strava {
+  width: 100%;
+}
+
+.welcome-steps {
+  text-align: left;
+  margin: 6px 0 0;
+  padding-left: 20px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* Map legend (Leaflet control, bottom-left). */
+.legend {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legend .sw {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.legend .ln {
+  width: 14px;
+  height: 0;
+  border-top: 3px solid;
+  flex: 0 0 auto;
+}
+
+.sw-open {
+  background: #c8ccd1;
+}
+
+.sw-done {
+  background: var(--green);
+}
+
+.sw-sel {
+  background: var(--orange);
+}
+
+.ln-route {
+  border-top-color: #1565c0;
+}
+
+.ln-import {
+  border-top-color: #7b1fa2;
+  border-top-style: dashed;
 }
 
 @media (prefers-reduced-motion: reduce) {

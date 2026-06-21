@@ -28,6 +28,37 @@ const selMarkers = {}; // code -> checkmark marker
 let lastRoutePoints = null; // [[lat,lon],...] of the last computed route
 let lastClearedSelection = null; // snapshot for "undo clear"
 
+// --- map legend (static content) --------------------------------------------
+const legend = L.control({ position: "bottomleft" });
+legend.onAdd = () => {
+  const div = L.DomUtil.create("div", "legend");
+  div.innerHTML =
+    '<div class="legend-row"><span class="sw sw-sel"></span>Geselecteerd</div>' +
+    '<div class="legend-row"><span class="sw sw-done"></span>Afgevinkt</div>' +
+    '<div class="legend-row"><span class="sw sw-open"></span>Open</div>' +
+    '<div class="legend-row"><span class="ln ln-route"></span>Route</div>' +
+    '<div class="legend-row"><span class="ln ln-import"></span>Geïmporteerd</div>';
+  return div;
+};
+legend.addTo(map);
+
+// --- first-run welcome overlay (static content; connect button lives here) ---
+const welcome = document.createElement("div");
+welcome.id = "welcome";
+welcome.className = "welcome hidden";
+welcome.innerHTML =
+  '<div class="welcome-card">' +
+  '<img src="/static/icon.svg" width="40" height="40" alt="" />' +
+  "<h2>Welkom bij Postcodejager</h2>" +
+  "<p>Verbind je Strava om te zien welke postcodes je al hebt gereden.</p>" +
+  '<a id="connect-btn" class="btn btn-strava" href="/auth/login">Verbind met Strava</a>' +
+  '<ol class="welcome-steps">' +
+  "<li>Verbind Strava — je ritten laden automatisch in.</li>" +
+  "<li>Klik postcodes, of sleep met Shift een gebied, om mee te nemen.</li>" +
+  "<li>Bereken een route en exporteer de GPX.</li>" +
+  "</ol></div>";
+map.getContainer().appendChild(welcome);
+
 // --- helpers ----------------------------------------------------------------
 function showMessage(text, isError) {
   const el = document.getElementById("message");
@@ -63,7 +94,8 @@ async function loadStatus() {
   const pill = document.getElementById("conn-status");
   pill.textContent = s.connected ? "verbonden" : "niet verbonden";
   pill.className = "pill " + (s.connected ? "pill-on" : "pill-off");
-  // When connected, hide the connect button and show the small refresh button.
+  // When connected: hide the welcome overlay + connect button, show refresh.
+  document.getElementById("welcome").classList.toggle("hidden", s.connected);
   document.getElementById("connect-btn").classList.toggle("hidden", s.connected);
   document.getElementById("refresh-btn").classList.toggle("hidden", !s.connected);
   document.getElementById("collected-count").textContent = s.collected_count;

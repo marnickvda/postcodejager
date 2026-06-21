@@ -1,4 +1,4 @@
-# Postcodejager 🧡
+# Postcodejager 🚴
 
 Een tool om de **PostNL Postcode Challenge** efficiënt af te vinken op de
 racefiets. Hij leidt uit je Strava-ritten af welke van de ~4.000 PC4-postcode­

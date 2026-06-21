@@ -37,6 +37,20 @@ def test_centroid_within_polygon():
     assert idx.code_for_point((lat, lon)) == "1011"
 
 
+def test_entry_point_near_edge_and_inside():
+    idx = load()
+    cen = idx.centroid("1011")  # ~ (52.37, 4.91)
+    ep = idx.entry_point("1011", (52.37, 4.80))  # corridor far to the west
+    assert idx.code_for_point(ep) == "1011"  # still inside the area
+    assert ep[1] < cen[1]  # nearer the west edge than the centre
+
+
+def test_entry_point_target_inside_unchanged():
+    idx = load()
+    inside = idx.centroid("1011")
+    assert idx.entry_point("1011", inside) == inside
+
+
 def test_provinces():
     idx = load()
     assert idx.province_of("1011") == "Noord-Holland"

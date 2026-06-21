@@ -208,10 +208,23 @@ def create_app(settings: Settings, index_provider, strava_client=None) -> FastAP
                 status_code=400,
                 detail="Selecteer minstens 2 postcodes voor een route",
             )
-        ordered = planning_mod.plan_order(
-            [idx.centroid(c) for c in planned], loop=req.loop
-        )
-        waypoints = ordered + ([ordered[0]] if req.loop else [])
+        cents = [idx.centroid(c) for c in planned]
+        ordered_pts = planning_mod.plan_order(cents, loop=req.loop)
+        code_by_pt = {cents[i]: planned[i] for i in range(len(planned))}
+        ordered_codes = [code_by_pt[p] for p in ordered_pts]
+        # Route through an entry point near the corridor (midpoint of neighbours)
+        # rather than each area's centre, so big areas aren't deep detours.
+        n = len(ordered_pts)
+        waypoints = []
+        for i in range(n):
+            if req.loop:
+                prev, nxt = ordered_pts[(i - 1) % n], ordered_pts[(i + 1) % n]
+            else:
+                prev, nxt = ordered_pts[max(0, i - 1)], ordered_pts[min(n - 1, i + 1)]
+            target = ((prev[0] + nxt[0]) / 2, (prev[1] + nxt[1]) / 2)
+            waypoints.append(idx.entry_point(ordered_codes[i], target))
+        if req.loop:
+            waypoints.append(waypoints[0])
         try:
             result = routing_mod.route(
                 waypoints,

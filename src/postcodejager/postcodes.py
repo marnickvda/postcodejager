@@ -6,6 +6,7 @@ returns ``(lat, lon)`` to match the rest of the codebase.
 import json
 
 from shapely.geometry import Point, mapping, shape
+from shapely.ops import nearest_points
 from shapely.strtree import STRtree
 
 # Property keys that may hold the 4-digit code across data sources.
@@ -70,6 +71,26 @@ class PC4Index:
 
     def province_of(self, code: str) -> str | None:
         return self._provinces.get(code)
+
+    def entry_point(
+        self, code: str, target: tuple[float, float]
+    ) -> tuple[float, float]:
+        """A point inside area ``code`` near the route corridor ``target``.
+
+        ``target`` is a ``(lat, lon)`` hint for where the route passes. The route
+        only needs to touch the area, so instead of its centre we return the
+        point closest to ``target`` nudged just inside the edge — large areas get
+        clipped at the boundary instead of forcing a deep detour to the middle.
+        """
+        poly = self._polys[code]
+        tp = Point(target[1], target[0])
+        if poly.contains(tp):
+            return (target[0], target[1])
+        near = nearest_points(poly, tp)[0]  # boundary point closest to target
+        rep = poly.representative_point()  # a point guaranteed inside
+        x = near.x + 0.25 * (rep.x - near.x)
+        y = near.y + 0.25 * (rep.y - near.y)
+        return (y, x)
 
     def codes_by_province(self) -> dict[str, set[str]]:
         out: dict[str, set[str]] = {}

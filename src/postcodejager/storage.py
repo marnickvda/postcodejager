@@ -5,7 +5,9 @@ import sqlite3
 
 class Store:
     def __init__(self, db_path: str):
-        self._conn = sqlite3.connect(db_path)
+        # check_same_thread=False: FastAPI runs sync endpoints in a threadpool,
+        # so the connection is reused across threads in this single-user tool.
+        self._conn = sqlite3.connect(db_path, check_same_thread=False)
         self._conn.execute(
             "CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)"
         )

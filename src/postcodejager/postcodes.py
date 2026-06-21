@@ -5,7 +5,7 @@ returns ``(lat, lon)`` to match the rest of the codebase.
 """
 import json
 
-from shapely.geometry import Point, shape
+from shapely.geometry import Point, mapping, shape
 from shapely.strtree import STRtree
 
 # Property keys that may hold the 4-digit code across data sources.
@@ -61,6 +61,28 @@ class PC4Index:
         """A representative interior point of the area, as ``(lat, lon)``."""
         c = self._polys[code].representative_point()
         return (c.y, c.x)
+
+    def to_feature_collection(
+        self, collected: set[str], simplify_tolerance: float | None = None
+    ) -> dict:
+        """GeoJSON for display, each area tagged with ``collected`` (bool).
+
+        ``simplify_tolerance`` (degrees) thins geometry for lighter payloads;
+        ``None`` keeps full resolution.
+        """
+        features = []
+        for code in self._codes:
+            geom = self._polys[code]
+            if simplify_tolerance:
+                geom = geom.simplify(simplify_tolerance, preserve_topology=True)
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {"postcode": code, "collected": code in collected},
+                    "geometry": mapping(geom),
+                }
+            )
+        return {"type": "FeatureCollection", "features": features}
 
 
 def download_pc4_geojson(dest: str, url: str, http=None) -> str:

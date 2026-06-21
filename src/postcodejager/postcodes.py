@@ -23,9 +23,10 @@ def _code_of(props: dict) -> str:
 class PC4Index:
     """Spatial index over PC4 polygons for point-in-polygon lookups."""
 
-    def __init__(self, polygons: dict):
+    def __init__(self, polygons: dict, provinces: dict | None = None):
         # polygons: code -> shapely geometry in lon/lat coordinates
         self._polys = polygons
+        self._provinces = provinces or {}  # code -> province name
         self._codes = list(polygons)
         self._geoms = [polygons[c] for c in self._codes]
         self._tree = STRtree(self._geoms)
@@ -33,10 +34,15 @@ class PC4Index:
     @classmethod
     def from_geojson(cls, data: dict) -> "PC4Index":
         polys: dict = {}
+        provinces: dict = {}
         for feat in data["features"]:
-            code = _code_of(feat.get("properties", {}))
+            props = feat.get("properties", {})
+            code = _code_of(props)
             polys[code] = shape(feat["geometry"])
-        return cls(polys)
+            prov = props.get("prov_name")
+            if prov:
+                provinces[code] = str(prov)
+        return cls(polys, provinces)
 
     def codes(self) -> set[str]:
         return set(self._codes)
@@ -61,6 +67,15 @@ class PC4Index:
         """A representative interior point of the area, as ``(lat, lon)``."""
         c = self._polys[code].representative_point()
         return (c.y, c.x)
+
+    def province_of(self, code: str) -> str | None:
+        return self._provinces.get(code)
+
+    def codes_by_province(self) -> dict[str, set[str]]:
+        out: dict[str, set[str]] = {}
+        for code, prov in self._provinces.items():
+            out.setdefault(prov, set()).add(code)
+        return out
 
     def to_feature_collection(
         self, collected: set[str], simplify_tolerance: float | None = None

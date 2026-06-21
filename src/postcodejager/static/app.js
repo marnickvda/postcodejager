@@ -143,6 +143,40 @@ async function loadCollected() {
   const data = await res.json();
   collectedSet = new Set(data.collected);
   if (pc4Layer) pc4Layer.setStyle(pc4Style);
+  loadProvinces(); // per-province completion depends on the collected set
+}
+
+async function loadProvinces() {
+  const res = await fetch("/api/provinces");
+  const { provinces } = await res.json();
+  const list = document.getElementById("prov-list");
+  list.innerHTML = "";
+  const fmt = (n) =>
+    n.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  for (const p of provinces) {
+    const li = document.createElement("li");
+    li.className = "prov-row";
+
+    const head = document.createElement("div");
+    head.className = "prov-head";
+    const name = document.createElement("span");
+    name.className = "prov-name";
+    name.textContent = p.name;
+    const meta = document.createElement("span");
+    meta.className = "prov-meta";
+    meta.textContent = `${fmt(p.percent)}% · ${p.collected}/${p.total}`;
+    head.append(name, meta);
+
+    const bar = document.createElement("div");
+    bar.className = "bar bar-sm";
+    const fill = document.createElement("div");
+    fill.className = "bar-fill";
+    fill.style.transform = "scaleX(" + p.percent / 100 + ")";
+    bar.appendChild(fill);
+
+    li.append(head, bar);
+    list.appendChild(li);
+  }
 }
 
 // --- selection --------------------------------------------------------------

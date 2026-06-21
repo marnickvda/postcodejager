@@ -120,6 +120,24 @@ def create_app(
     def collected():
         return {"collected": sorted(store.get_collected())}
 
+    @app.get("/api/provinces")
+    def provinces():
+        collected = store.get_collected()
+        rows = []
+        for name, codes in index_provider().codes_by_province().items():
+            total = len(codes)
+            done = len(codes & collected)
+            rows.append(
+                {
+                    "name": name,
+                    "total": total,
+                    "collected": done,
+                    "percent": round(done / total * 100, 1) if total else 0.0,
+                }
+            )
+        rows.sort(key=lambda r: r["name"])
+        return {"provinces": rows}
+
     # --- planned selection (postcodes to include in the next route) -------
     @app.get("/api/planned")
     def planned():

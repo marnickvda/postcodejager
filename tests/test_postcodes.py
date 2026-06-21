@@ -35,3 +35,12 @@ def test_centroid_within_polygon():
     idx = load()
     lat, lon = idx.centroid("1011")
     assert idx.code_for_point((lat, lon)) == "1011"
+
+
+def test_provinces():
+    idx = load()
+    assert idx.province_of("1011") == "Noord-Holland"
+    assert idx.codes_by_province() == {
+        "Noord-Holland": {"1011"},
+        "Utrecht": {"1012"},
+    }

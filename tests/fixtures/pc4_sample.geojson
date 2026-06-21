@@ -3,7 +3,7 @@
   "features": [
     {
       "type": "Feature",
-      "properties": { "postcode": "1011" },
+      "properties": { "postcode": "1011", "prov_name": "Noord-Holland" },
       "geometry": {
         "type": "Polygon",
         "coordinates": [
@@ -13,7 +13,7 @@
     },
     {
       "type": "Feature",
-      "properties": { "postcode": "1012" },
+      "properties": { "postcode": "1012", "prov_name": "Utrecht" },
       "geometry": {
         "type": "Polygon",
         "coordinates": [

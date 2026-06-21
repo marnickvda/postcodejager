@@ -218,6 +218,78 @@ body {
   transition: transform 0.4s ease;
 }
 
+.bar-sm {
+  height: 5px;
+}
+
+.provinces {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.provinces summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.provinces summary::-webkit-details-marker {
+  display: none;
+}
+
+.provinces summary::before {
+  content: "▸";
+  font-size: 10px;
+  transition: transform 0.15s ease;
+}
+
+.provinces[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.provinces summary:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-radius: 4px;
+}
+
+.prov-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.prov-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prov-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.prov-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.prov-meta {
+  color: var(--muted);
+}
+
 .strava-status {
   display: inline-flex;
   align-items: center;

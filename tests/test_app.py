@@ -53,6 +53,17 @@ def test_status_reports_total_and_collected(tmp_path):
     assert body["total_count"] == 2
 
 
+def test_provinces_endpoint(tmp_path):
+    c, store = make(tmp_path)
+    store.set_collected({"1011"})
+    by = {p["name"]: p for p in c.get("/api/provinces").json()["provinces"]}
+    assert by["Noord-Holland"]["total"] == 1
+    assert by["Noord-Holland"]["collected"] == 1
+    assert by["Noord-Holland"]["percent"] == 100.0
+    assert by["Utrecht"]["collected"] == 0
+    assert by["Utrecht"]["percent"] == 0.0
+
+
 def test_geometry_endpoint_is_cacheable(tmp_path):
     c, _ = make(tmp_path)
     r = c.get("/api/pc4/geometry")

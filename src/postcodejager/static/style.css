@@ -426,6 +426,56 @@ body {
   line-height: 1.5;
 }
 
+.attribution p {
+  margin: 0 0 6px;
+}
+
+.attribution a {
+  color: var(--muted);
+  text-decoration: underline;
+}
+
+.compleet-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Standalone legal pages (privacy.html, voorwaarden.html). */
+.legal-body {
+  display: block;
+  height: auto;
+  background: var(--bg);
+}
+
+.legal {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 48px 24px 64px;
+  line-height: 1.65;
+}
+
+.legal h1 {
+  font-size: 28px;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+
+.legal h2 {
+  font-size: 18px;
+  margin: 28px 0 6px;
+}
+
+.legal .legal-meta {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 0;
+}
+
+.legal a {
+  color: var(--orange-dark);
+}
+
 .hidden {
   display: none;
 }

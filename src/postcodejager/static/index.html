@@ -4,6 +4,19 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Postcodejager</title>
+    <meta
+      name="description"
+      content="Hulptool voor de PostNL Postcode Challenge. Zie welke postcodes je al hebt gereden en plan slim een route langs nieuwe."
+    />
+    <meta property="og:title" content="Postcodejager" />
+    <meta
+      property="og:description"
+      content="Hulptool voor de PostNL Postcode Challenge. Zie je voortgang en plan routes langs nieuwe postcodes."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://postcodejager.nl/" />
+    <meta property="og:image" content="https://postcodejager.nl/static/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
     <link rel="icon" type="image/svg+xml" href="/static/icon.svg" />
     <link
       rel="stylesheet"
@@ -30,11 +43,7 @@
       <header class="brand">
         <div class="brand-top">
           <h1><img class="brand-icon" src="/static/icon.svg" alt="" width="26" height="26" />Postcodejager</h1>
-          <span class="strava-status">
-            <span id="conn-status" class="pill pill-off">niet verbonden</span>
-            <button id="refresh-btn" class="icon-btn hidden" type="button"
-              title="Ritten verversen" aria-label="Ritten verversen">↻</button>
-          </span>
+          <span id="conn-status" class="pill pill-off">niet verbonden</span>
         </div>
         <p class="tagline">
           Hulptool voor de
@@ -46,7 +55,11 @@
       <section class="card">
         <div class="row">
           <span class="label">Compleet</span>
-          <span id="percent" class="percent">–</span>
+          <span class="compleet-head">
+            <span id="percent" class="percent">–</span>
+            <button id="refresh-btn" class="icon-btn hidden" type="button"
+              title="Ritten verversen" aria-label="Ritten verversen">↻</button>
+          </span>
         </div>
         <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
         <div class="stats">
@@ -132,8 +145,15 @@
       <p id="message" class="message hidden"></p>
 
       <footer class="attribution">
-        Data: CBS PC4 (CC BY 4.0) · © OpenStreetMap-bijdragers · routing BRouter ·
-        activiteiten via Strava.
+        <p>Onafhankelijke tool, niet gelieerd aan PostNL of Strava.</p>
+        <p>
+          <a href="/static/privacy.html">Privacy</a> ·
+          <a href="/static/voorwaarden.html">Voorwaarden</a>
+        </p>
+        <p>
+          Data: CBS PC4 (CC BY 4.0) · © OpenStreetMap-bijdragers (ODbL) · tegels
+          CARTO · routing BRouter · activiteiten via Strava.
+        </p>
       </footer>
     </aside>
 

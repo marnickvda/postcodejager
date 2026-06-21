@@ -74,3 +74,13 @@ resource "hcloud_zone_rrset" "app" {
   ttl     = 300
   records = [{ value = hcloud_server.app.ipv4_address }]
 }
+
+# www -> same server (only for apex deploys; Caddy redirects www to the apex).
+resource "hcloud_zone_rrset" "www" {
+  count   = var.subdomain == "@" ? 1 : 0
+  zone    = hcloud_zone.main.name
+  name    = "www"
+  type    = "A"
+  ttl     = 300
+  records = [{ value = hcloud_server.app.ipv4_address }]
+}

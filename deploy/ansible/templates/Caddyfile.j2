@@ -1,3 +1,7 @@
+www.{{ domain }} {
+    redir https://{{ domain }}{uri} permanent
+}
+
 {{ domain }} {
     encode gzip
     reverse_proxy 127.0.0.1:8000

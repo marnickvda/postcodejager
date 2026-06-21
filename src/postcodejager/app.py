@@ -61,6 +61,7 @@ def create_app(
         return {
             "connected": store.load_token() is not None,
             "collected_count": len(store.get_collected()),
+            "total_count": len(index_provider().codes()),
             "last_sync": store.get_last_sync(),
         }
 

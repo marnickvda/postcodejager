@@ -29,14 +29,21 @@
         <button id="sync-btn" class="btn" type="button">Synchroniseer ritten</button>
       </section>
 
-      <section class="card stats">
-        <div class="stat">
-          <span id="collected-count" class="stat-value">–</span>
-          <span class="stat-label">afgevinkt</span>
+      <section class="card">
+        <div class="row">
+          <span class="label">Compleet</span>
+          <span id="percent" class="percent">–</span>
         </div>
-        <div class="stat">
-          <span id="last-sync" class="stat-value">–</span>
-          <span class="stat-label">laatste sync</span>
+        <div class="bar"><div id="bar-fill" class="bar-fill"></div></div>
+        <div class="stats">
+          <div class="stat">
+            <span id="collected-count" class="stat-value">–</span>
+            <span class="stat-label">van <span id="total-count">–</span> postcodes</span>
+          </div>
+          <div class="stat">
+            <span id="last-sync" class="stat-value-sm">–</span>
+            <span class="stat-label">laatste sync</span>
+          </div>
         </div>
       </section>
 

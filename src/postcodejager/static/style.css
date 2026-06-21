@@ -175,10 +175,40 @@ body {
   gap: 8px;
 }
 
+.percent {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--orange-dark);
+}
+
+.bar {
+  height: 8px;
+  background: var(--line);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 100%;
+  transform: scaleX(0);
+  transform-origin: left center;
+  background: var(--orange);
+  border-radius: 999px;
+  transition: transform 0.4s ease;
+}
+
 .stats {
+  display: flex;
   flex-direction: row;
   justify-content: space-around;
   text-align: center;
+  gap: 8px;
+}
+
+.stat-value-sm {
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .stat {
@@ -228,6 +258,22 @@ body {
 
 .hidden {
   display: none;
+}
+
+.hover-hint {
+  position: absolute;
+  z-index: 1000;
+  transform: translate(-50%, -100%);
+  pointer-events: none;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  box-shadow: var(--shadow);
+  white-space: nowrap;
 }
 
 .wp-marker {

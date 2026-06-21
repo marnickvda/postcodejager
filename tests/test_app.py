@@ -41,6 +41,15 @@ def test_status_initial(tmp_path):
     assert r.status_code == 200
     assert r.json()["connected"] is False
     assert r.json()["collected_count"] == 0
+    assert r.json()["total_count"] == 2  # fixture has 2 PC4 areas
+
+
+def test_status_reports_total_and_collected(tmp_path):
+    c, store = make(tmp_path)
+    store.set_collected({"1011"})
+    body = c.get("/api/status").json()
+    assert body["collected_count"] == 1
+    assert body["total_count"] == 2
 
 
 def test_pc4_reflects_collected(tmp_path):

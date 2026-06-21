@@ -41,10 +41,47 @@ async function loadStatus() {
   pill.textContent = s.connected ? "verbonden" : "niet verbonden";
   pill.className = "pill " + (s.connected ? "pill-on" : "pill-off");
   document.getElementById("collected-count").textContent = s.collected_count;
+  document.getElementById("total-count").textContent = s.total_count;
+  const pct = s.total_count ? (s.collected_count / s.total_count) * 100 : 0;
+  document.getElementById("percent").textContent =
+    pct.toLocaleString("nl-NL", {
+      minimumFractionDigits: 1,
+      maximumFractionDigits: 1,
+    }) + "%";
+  document.getElementById("bar-fill").style.transform = "scaleX(" + pct / 100 + ")";
   document.getElementById("last-sync").textContent = s.last_sync
     ? new Date(s.last_sync * 1000).toLocaleDateString("nl-NL")
     : "nooit";
 }
+
+// Custom hover hint: a plain DOM element we fully control. Leaflet's own
+// tooltips get left "stuck" when a mouseout is missed during zoom/pan/resize;
+// toggling display on our own element can never get stuck.
+function featureLabel(f) {
+  return `${f.properties.postcode} — ${
+    f.properties.collected ? "afgevinkt" : "open"
+  }`;
+}
+
+const hint = document.createElement("div");
+hint.className = "hover-hint";
+hint.style.display = "none";
+map.getContainer().appendChild(hint);
+
+function showHint(containerPoint, text) {
+  hint.textContent = text;
+  hint.style.left = containerPoint.x + "px";
+  hint.style.top = containerPoint.y - 12 + "px";
+  hint.style.display = "block";
+}
+
+function hideHint() {
+  hint.style.display = "none";
+}
+
+// Any view change or the cursor leaving the map hides the hint.
+map.on("zoomstart movestart", hideHint);
+map.getContainer().addEventListener("mouseleave", hideHint);
 
 async function loadPC4() {
   const res = await fetch("/api/pc4");
@@ -52,12 +89,10 @@ async function loadPC4() {
   if (pc4Layer) map.removeLayer(pc4Layer);
   pc4Layer = L.geoJSON(geo, {
     style: pc4Style,
-    onEachFeature: (f, layer) =>
-      layer.bindTooltip(
-        `${f.properties.postcode} — ${
-          f.properties.collected ? "afgevinkt" : "open"
-        }`
-      ),
+    onEachFeature: (f, layer) => {
+      layer.on("mousemove", (e) => showHint(e.containerPoint, featureLabel(f)));
+      layer.on("mouseout", hideHint);
+    },
   }).addTo(map);
 }
 

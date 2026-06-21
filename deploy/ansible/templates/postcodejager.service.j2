@@ -1,0 +1,14 @@
+[Unit]
+Description=Postcodejager
+After=network.target
+
+[Service]
+User={{ app_user }}
+WorkingDirectory={{ app_dir }}
+EnvironmentFile={{ app_dir }}/.env
+ExecStart={{ app_dir }}/.venv/bin/python -m postcodejager
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

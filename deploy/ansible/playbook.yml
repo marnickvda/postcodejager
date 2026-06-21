@@ -1,0 +1,139 @@
+---
+# Configures the server and deploys the app. Idempotent: CI re-runs it on every
+# push to main; it pulls the latest code, installs deps, and restarts the service.
+- name: Deploy Postcodejager
+  hosts: all
+  become: true
+  vars:
+    app_dir: /opt/postcodejager
+    app_user: postcodejager
+    repo_url: "{{ repo_url }}" # e.g. https://github.com/you/postcodejager.git
+    branch: main
+    domain: "{{ domain }}" # e.g. postcodejager.example.com
+    strava_client_id: "{{ strava_client_id }}"
+    strava_client_secret: "{{ strava_client_secret }}"
+    brouter_base_url: "https://brouter.de/brouter"
+    brouter_profile: "trekking"
+
+  handlers:
+    - name: restart app
+      ansible.builtin.systemd:
+        name: postcodejager
+        state: restarted
+    - name: reload caddy
+      ansible.builtin.systemd:
+        name: caddy
+        state: reloaded
+
+  tasks:
+    - name: Install base packages
+      ansible.builtin.apt:
+        name:
+          - python3
+          - python3-venv
+          - git
+          - curl
+          - debian-keyring
+          - debian-archive-keyring
+          - apt-transport-https
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Add Caddy apt key
+      ansible.builtin.get_url:
+        url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+        dest: /usr/share/keyrings/caddy-stable.asc
+        mode: "0644"
+
+    - name: Add Caddy apt repo
+      ansible.builtin.copy:
+        content: "deb [signed-by=/usr/share/keyrings/caddy-stable.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main\n"
+        dest: /etc/apt/sources.list.d/caddy-stable.list
+        mode: "0644"
+
+    - name: Install Caddy
+      ansible.builtin.apt:
+        name: caddy
+        update_cache: true
+
+    - name: Create app user
+      ansible.builtin.user:
+        name: "{{ app_user }}"
+        system: true
+        home: "{{ app_dir }}"
+        shell: /usr/sbin/nologin
+
+    - name: Clone or update the repo
+      ansible.builtin.git:
+        repo: "{{ repo_url }}"
+        dest: "{{ app_dir }}"
+        version: "{{ branch }}"
+        force: true
+      notify: restart app
+
+    - name: Create virtualenv
+      ansible.builtin.command:
+        cmd: python3 -m venv "{{ app_dir }}/.venv"
+        creates: "{{ app_dir }}/.venv/bin/python"
+
+    - name: Install the app into the venv
+      ansible.builtin.command:
+        cmd: "{{ app_dir }}/.venv/bin/pip install -e ."
+        chdir: "{{ app_dir }}"
+      notify: restart app
+
+    - name: Write .env
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ app_dir }}/.env"
+        mode: "0640"
+      notify: restart app
+
+    - name: Ensure data dir exists
+      ansible.builtin.file:
+        path: "{{ app_dir }}/data"
+        state: directory
+        mode: "0755"
+
+    - name: Fetch PC4 data (once)
+      ansible.builtin.command:
+        cmd: "{{ app_dir }}/.venv/bin/python scripts/fetch_pc4.py"
+        chdir: "{{ app_dir }}"
+        creates: "{{ app_dir }}/data/pc4.geojson"
+
+    - name: Own the app dir
+      ansible.builtin.file:
+        path: "{{ app_dir }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        recurse: true
+
+    - name: Install systemd unit
+      ansible.builtin.template:
+        src: postcodejager.service.j2
+        dest: /etc/systemd/system/postcodejager.service
+        mode: "0644"
+      notify: restart app
+
+    - name: Enable + start app
+      ansible.builtin.systemd:
+        name: postcodejager
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Write Caddyfile
+      ansible.builtin.template:
+        src: Caddyfile.j2
+        dest: /etc/caddy/Caddyfile
+        mode: "0644"
+      notify: reload caddy
+
+    - name: Enable + start Caddy
+      ansible.builtin.systemd:
+        name: caddy
+        enabled: true
+        state: started
+
+    - name: Flush handlers so a code change restarts the app now
+      ansible.builtin.meta: flush_handlers

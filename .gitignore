@@ -8,3 +8,9 @@ data/
 *.egg-info/
 build/
 dist/
+
+# OpenTofu / Terraform — never commit state or secret vars
+deploy/tofu/.terraform/
+deploy/tofu/*.tfstate
+deploy/tofu/*.tfstate.*
+deploy/tofu/terraform.tfvars

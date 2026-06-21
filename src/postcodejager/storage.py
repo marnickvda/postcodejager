@@ -66,6 +66,12 @@ class Store:
             self.set_planned(planned)
             return planned
 
+    def add_planned(self, codes: set[str]) -> set[str]:
+        with self._lock:  # union many at once (box-select)
+            merged = self.get_planned() | set(codes)
+            self.set_planned(merged)
+            return merged
+
     def clear_planned(self) -> None:
         self._set("planned", [])
 

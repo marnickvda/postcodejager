@@ -306,6 +306,74 @@ async function undoClear() {
   clearMessage();
 }
 
+// --- box select (Shift + drag) ----------------------------------------------
+map.boxZoom.disable(); // repurpose Shift+drag from zoom to area-select
+let boxStart = null;
+let boxRect = null;
+
+function setBoxCursor(on) {
+  map.getContainer().classList.toggle("box-mode", on);
+}
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Shift") setBoxCursor(true);
+});
+document.addEventListener("keyup", (e) => {
+  if (e.key === "Shift") setBoxCursor(false);
+});
+
+map.on("mousedown", (e) => {
+  if (!e.originalEvent.shiftKey || !pc4Layer) return;
+  hideHint();
+  boxStart = e.latlng;
+  map.dragging.disable();
+  boxRect = L.rectangle([boxStart, boxStart], {
+    color: "#e85d0a",
+    weight: 1,
+    fillColor: "#ff6a13",
+    fillOpacity: 0.12,
+    interactive: false,
+  }).addTo(map);
+});
+
+map.on("mousemove", (e) => {
+  if (boxStart && boxRect) boxRect.setBounds(L.latLngBounds(boxStart, e.latlng));
+});
+
+map.on("mouseup", async () => {
+  if (!boxStart) return;
+  const bounds = boxRect.getBounds();
+  map.removeLayer(boxRect);
+  boxRect = null;
+  boxStart = null;
+  map.dragging.enable();
+  // Add every postcode whose centre falls inside the box (additive).
+  const codes = [];
+  pc4Layer.eachLayer((l) => {
+    if (bounds.contains(l.getBounds().getCenter())) {
+      const code = l.feature.properties.postcode;
+      if (!selectedSet.has(code)) codes.push(code);
+    }
+  });
+  if (codes.length) await boxSelect(codes);
+});
+
+async function boxSelect(codes) {
+  const res = await fetch("/api/planned/add", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ codes }),
+  });
+  selectedSet = new Set((await res.json()).planned);
+  pc4Layer.eachLayer((l) => {
+    const code = l.feature.properties.postcode;
+    if (selectedSet.has(code)) {
+      addSelMarker(code, l);
+      l.setStyle(pc4Style(l.feature));
+    }
+  });
+  refreshSelectionUI();
+}
+
 // --- actions ----------------------------------------------------------------
 // background=true is used for the silent auto-sync on page load: it only
 // surfaces a message when something actually changed (or on error).

@@ -32,6 +32,10 @@ class ToggleRequest(BaseModel):
     code: str
 
 
+class CodesRequest(BaseModel):
+    codes: list[str]
+
+
 class TrackRequest(BaseModel):
     points: list[tuple[float, float]]
     name: str = "Postcodejager route"
@@ -151,6 +155,10 @@ def create_app(
     @app.post("/api/planned/toggle")
     def planned_toggle(req: ToggleRequest):
         return {"planned": sorted(store.toggle_planned(req.code))}
+
+    @app.post("/api/planned/add")
+    def planned_add(req: CodesRequest):
+        return {"planned": sorted(store.add_planned(set(req.codes)))}
 
     @app.post("/api/planned/clear")
     def planned_clear():

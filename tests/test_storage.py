@@ -51,6 +51,13 @@ def test_concurrent_access_does_not_error(tmp_path):
     assert errors == []
 
 
+def test_add_planned_unions(tmp_path):
+    s = Store(str(tmp_path / "db.sqlite"))
+    s.toggle_planned("1011")
+    assert s.add_planned({"1012", "1013", "1011"}) == {"1011", "1012", "1013"}
+    assert s.get_planned() == {"1011", "1012", "1013"}
+
+
 def test_planned_toggle_and_clear(tmp_path):
     s = Store(str(tmp_path / "db.sqlite"))
     assert s.get_planned() == set()

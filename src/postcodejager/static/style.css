@@ -414,6 +414,23 @@ body {
   transition: fill-opacity 120ms ease-out, stroke-width 120ms ease-out;
 }
 
+/* While Shift is held, the whole map signals box-select. */
+.leaflet-container.box-mode,
+.leaflet-container.box-mode .leaflet-interactive {
+  cursor: crosshair;
+}
+
+kbd {
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 0 4px;
+  color: var(--ink);
+}
+
 .checkbox {
   display: flex;
   align-items: center;

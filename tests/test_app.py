@@ -93,6 +93,13 @@ def test_planned_toggle_get_clear(tmp_path):
     assert c.get("/api/planned").json()["planned"] == []
 
 
+def test_planned_add_bulk(tmp_path):
+    c, _ = make(tmp_path)
+    c.post("/api/planned/toggle", json={"code": "1011"})
+    body = c.post("/api/planned/add", json={"codes": ["1012", "1011"]}).json()
+    assert body["planned"] == ["1011", "1012"]
+
+
 def test_route_auto_through_selected(tmp_path):
     c, store = make(tmp_path)
     store.set_planned({"1011", "1012"})

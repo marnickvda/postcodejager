@@ -75,6 +75,21 @@
         state: absent
       when: not app_git.stat.exists
 
+    # The first deploy chowns the tree to {{ app_user }} ("Own the app dir"),
+    # after which root's git refuses to touch it (CVE-2022-24765 "dubious
+    # ownership"). Mark it safe for root before the clone/update runs.
+    - name: Read root's git safe.directory entries
+      ansible.builtin.command:
+        cmd: git config --global --get-all safe.directory
+      register: git_safe_dirs
+      changed_when: false
+      failed_when: false
+
+    - name: Trust the app dir for root's git
+      ansible.builtin.command:
+        cmd: git config --global --add safe.directory {{ app_dir }}
+      when: app_dir not in git_safe_dirs.stdout_lines
+
     - name: Clone or update the repo
       ansible.builtin.git:
         repo: "{{ repo_url }}"

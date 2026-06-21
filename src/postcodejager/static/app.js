@@ -22,7 +22,10 @@ L.tileLayer(
 let pc4Layer = null;
 let routeLayer = null;
 let collectedSet = new Set(); // PC4 codes already ridden (from Strava)
-const waypoints = []; // array of L.marker, in order
+let selectedSet = new Set(); // PC4 codes selected to include in the next route
+const selMarkers = {}; // code -> checkmark marker
+let lastRoutePoints = null; // [[lat,lon],...] of the last computed route
+let lastClearedSelection = null; // snapshot for "undo clear"
 
 // --- helpers ----------------------------------------------------------------
 function showMessage(text, isError) {
@@ -37,7 +40,13 @@ function clearMessage() {
 }
 
 function pc4Style(feature) {
-  const collected = collectedSet.has(feature.properties.postcode);
+  const code = feature.properties.postcode;
+  // Selected is the actionable state, so it gets the strongest treatment
+  // (and a checkmark marker — never color alone).
+  if (selectedSet.has(code)) {
+    return { color: "#e85d0a", weight: 3, fillColor: "#ff6a13", fillOpacity: 0.55 };
+  }
+  const collected = collectedSet.has(code);
   return {
     color: collected ? "#2e7d32" : "#9aa0a6",
     weight: 1,
@@ -75,8 +84,13 @@ async function loadStatus() {
 // tooltips get left "stuck" when a mouseout is missed during zoom/pan/resize;
 // toggling display on our own element can never get stuck.
 function featureLabel(f) {
-  const collected = collectedSet.has(f.properties.postcode);
-  return `${f.properties.postcode} — ${collected ? "afgevinkt" : "open"}`;
+  const code = f.properties.postcode;
+  const state = selectedSet.has(code)
+    ? "geselecteerd"
+    : collectedSet.has(code)
+      ? "afgevinkt"
+      : "open";
+  return `${code} — ${state}`;
 }
 
 const hint = document.createElement("div");
@@ -108,8 +122,17 @@ async function loadGeometry() {
   pc4Layer = L.geoJSON(geo, {
     style: pc4Style,
     onEachFeature: (f, layer) => {
+      const code = f.properties.postcode;
       layer.on("mousemove", (e) => showHint(e.containerPoint, featureLabel(f)));
-      layer.on("mouseout", hideHint);
+      layer.on("mouseover", () => {
+        if (!selectedSet.has(code)) layer.setStyle({ weight: 3, color: "#5f6368" });
+        layer.bringToFront();
+      });
+      layer.on("mouseout", () => {
+        hideHint();
+        layer.setStyle(pc4Style(f)); // revert the transient hover highlight
+      });
+      layer.on("click", () => toggleSelect(code, layer));
     },
   }).addTo(map);
 }
@@ -121,50 +144,132 @@ async function loadCollected() {
   if (pc4Layer) pc4Layer.setStyle(pc4Style);
 }
 
-// --- waypoints --------------------------------------------------------------
-function renumber() {
-  waypoints.forEach((m, i) => {
-    m.setIcon(
-      L.divIcon({
-        className: "",
-        html: `<div class="wp-marker">${i + 1}</div>`,
-        iconSize: [24, 24],
-        iconAnchor: [12, 12],
-      })
-    );
+// --- selection --------------------------------------------------------------
+function addSelMarker(code, layer) {
+  if (selMarkers[code]) return;
+  selMarkers[code] = L.marker(layer.getBounds().getCenter(), {
+    icon: L.divIcon({
+      className: "",
+      html: '<div class="sel-check" aria-hidden="true">✓</div>',
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    }),
+    interactive: false,
+    keyboard: false,
+  }).addTo(map);
+}
+
+function removeSelMarker(code) {
+  if (selMarkers[code]) {
+    map.removeLayer(selMarkers[code]);
+    delete selMarkers[code];
+  }
+}
+
+function restyleCode(code) {
+  if (!pc4Layer) return;
+  pc4Layer.eachLayer((l) => {
+    if (l.feature.properties.postcode === code) l.setStyle(pc4Style(l.feature));
   });
-  document.getElementById("wp-count").textContent = `${waypoints.length} punten`;
 }
 
-function addWaypoint(latlng) {
-  const marker = L.marker(latlng, { draggable: true }).addTo(map);
-  marker.on("dragend", () => {}); // position read live at route time
-  marker.on("contextmenu", () => removeWaypoint(marker));
-  waypoints.push(marker);
-  renumber();
-}
-
-function removeWaypoint(marker) {
-  const i = waypoints.indexOf(marker);
-  if (i >= 0) {
-    map.removeLayer(marker);
-    waypoints.splice(i, 1);
-    renumber();
+function refreshSelectionUI() {
+  const codes = [...selectedSet].sort();
+  document.getElementById("sel-count").textContent = `${codes.length} geselecteerd`;
+  document.getElementById("route-btn").textContent = codes.length
+    ? `Bereken route (${codes.length})`
+    : "Bereken route";
+  const list = document.getElementById("sel-list");
+  list.innerHTML = "";
+  for (const code of codes) {
+    const li = document.createElement("li");
+    li.className = "chip";
+    const label = document.createElement("span");
+    label.textContent = code;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.setAttribute("aria-label", `Verwijder ${code}`);
+    btn.textContent = "×";
+    btn.addEventListener("click", () => deselectCode(code));
+    li.append(label, btn);
+    list.appendChild(li);
   }
 }
 
-function clearWaypoints() {
-  waypoints.forEach((m) => map.removeLayer(m));
-  waypoints.length = 0;
-  if (routeLayer) {
-    map.removeLayer(routeLayer);
-    routeLayer = null;
-  }
-  document.getElementById("route-result").classList.add("hidden");
-  renumber();
+// The server owns the planned set; we sync our local copy from its response.
+async function persistToggle(code) {
+  const res = await fetch("/api/planned/toggle", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  selectedSet = new Set((await res.json()).planned);
 }
 
-map.on("click", (e) => addWaypoint(e.latlng));
+async function toggleSelect(code, layer) {
+  await persistToggle(code);
+  if (selectedSet.has(code)) addSelMarker(code, layer);
+  else removeSelMarker(code);
+  layer.setStyle(pc4Style(layer.feature));
+  refreshSelectionUI();
+}
+
+async function deselectCode(code) {
+  await persistToggle(code); // code was selected, so this removes it
+  removeSelMarker(code);
+  restyleCode(code);
+  refreshSelectionUI();
+}
+
+async function loadPlanned() {
+  const res = await fetch("/api/planned");
+  selectedSet = new Set((await res.json()).planned);
+  if (pc4Layer) {
+    pc4Layer.eachLayer((l) => {
+      const code = l.feature.properties.postcode;
+      if (selectedSet.has(code)) addSelMarker(code, l);
+      l.setStyle(pc4Style(l.feature));
+    });
+  }
+  refreshSelectionUI();
+}
+
+async function clearSelection() {
+  if (!selectedSet.size) return;
+  lastClearedSelection = [...selectedSet];
+  await fetch("/api/planned/clear", { method: "POST" });
+  Object.keys(selMarkers).forEach(removeSelMarker);
+  selectedSet = new Set();
+  if (pc4Layer) pc4Layer.setStyle(pc4Style);
+  refreshSelectionUI();
+  showUndo(`${lastClearedSelection.length} postcodes gewist.`);
+}
+
+function showUndo(text) {
+  const el = document.getElementById("message");
+  el.classList.remove("error", "hidden");
+  el.textContent = text + " ";
+  const undo = document.createElement("button");
+  undo.type = "button";
+  undo.className = "link-btn";
+  undo.textContent = "Ongedaan maken";
+  undo.addEventListener("click", undoClear);
+  el.appendChild(undo);
+}
+
+async function undoClear() {
+  if (!lastClearedSelection) return;
+  for (const code of lastClearedSelection) {
+    await fetch("/api/planned/toggle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code }),
+    });
+  }
+  lastClearedSelection = null;
+  await loadPlanned();
+  clearMessage();
+}
 
 // --- actions ----------------------------------------------------------------
 // background=true is used for the silent auto-sync on page load: it only
@@ -194,52 +299,52 @@ async function sync({ background = false } = {}) {
   }
 }
 
-function waypointCoords() {
-  return waypoints.map((m) => [m.getLatLng().lat, m.getLatLng().lng]);
-}
-
 async function computeRoute() {
   clearMessage();
-  if (waypoints.length < 2) {
-    showMessage("Plaats minstens 2 waypoints.", true);
+  if (selectedSet.size < 2) {
+    showMessage("Selecteer minstens 2 postcodes op de kaart.", true);
     return;
   }
   const btn = document.getElementById("route-btn");
   btn.disabled = true;
   btn.textContent = "Bezig…";
   try {
-    const res = await fetch("/api/route", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ waypoints: waypointCoords() }),
-    });
+    const res = await fetch("/api/route/auto", { method: "POST" });
     if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
     const data = await res.json();
     if (routeLayer) map.removeLayer(routeLayer);
     routeLayer = L.geoJSON(data.geojson, {
-      style: { color: "#ff6a13", weight: 4, opacity: 0.9 },
+      style: { color: "#1565c0", weight: 4, opacity: 0.9 },
     }).addTo(map);
+    // remember the snapped route geometry so export needs no re-routing
+    lastRoutePoints = data.geojson.geometry.coordinates.map(([lon, lat]) => [
+      lat,
+      lon,
+    ]);
     document.getElementById("route-distance").textContent =
       (data.distance_m / 1000).toFixed(1) + " km";
-    document.getElementById("route-new").textContent =
-      data.new_count + " nieuw";
+    document.getElementById("route-new").textContent = data.new_count + " nieuw";
     document.getElementById("route-result").classList.remove("hidden");
   } catch (err) {
     showMessage(`Routeren mislukt: ${err.message}`, true);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Bereken route";
+    refreshSelectionUI(); // restore the "Bereken route (N)" label
   }
 }
 
 async function exportGpx() {
   clearMessage();
+  if (!lastRoutePoints) {
+    showMessage("Bereken eerst een route.", true);
+    return;
+  }
   try {
-    const res = await fetch("/api/export", {
+    const res = await fetch("/api/export/track", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        waypoints: waypointCoords(),
+        points: lastRoutePoints,
         name: "Postcodejager " + new Date().toLocaleDateString("nl-NL"),
       }),
     });
@@ -259,10 +364,12 @@ async function exportGpx() {
 // --- wire up ----------------------------------------------------------------
 document.getElementById("refresh-btn").addEventListener("click", () => sync());
 document.getElementById("route-btn").addEventListener("click", computeRoute);
-document.getElementById("clear-btn").addEventListener("click", clearWaypoints);
+document.getElementById("clear-btn").addEventListener("click", clearSelection);
 document.getElementById("export-btn").addEventListener("click", exportGpx);
 
-loadCollected().then(loadGeometry);
+loadCollected()
+  .then(loadGeometry)
+  .then(loadPlanned);
 loadStatus().then((s) => {
   if (s.connected) sync({ background: true }); // silent auto-sync on load
 });

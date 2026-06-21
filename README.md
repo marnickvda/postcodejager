@@ -45,11 +45,14 @@ Dit downloadt de CBS PC4-grenzen (CC BY 4.0) naar `data/pc4.geojson`
 
 Open <http://localhost:8000>:
 
-1. **Verbind met Strava** en **Synchroniseer ritten** — de tool berekent welke
-   PC4-gebieden je al hebt gehad (groen) en welke nog open zijn (grijs).
-2. Klik waypoints op de kaart (rechtsklik = verwijderen, slepen = verschuiven).
-3. **Bereken route** — BRouter routeert over verharde wegen/fietspaden en toont
-   de afstand plus het aantal nieuwe postcodes dat de route raakt.
+1. **Verbind met Strava** — daarna synchroniseert de tool je ritten automatisch
+   op de achtergrond en berekent welke PC4-gebieden je al hebt gehad (groen) en
+   welke nog open zijn (grijs). Het ↻-knopje ververst handmatig.
+2. **Klik postcodes** op de kaart om ze mee te nemen in je route (oranje + ✓).
+   Nog eens klikken haalt ze weg; de selectie blijft bewaard tussen sessies.
+3. **Bereken route** — de tool kiest zelf een volgorde langs alle geselecteerde
+   postcodes en routeert er via BRouter doorheen over verharde wegen/fietspaden;
+   het toont de afstand plus het aantal nieuwe postcodes dat de route raakt.
 4. **Exporteer GPX**.
 
 ## GPX op je fietscomputer

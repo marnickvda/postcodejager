@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import coverage as coverage_mod
+from . import planning as planning_mod
 from . import routing as routing_mod
 from .config import Settings
 from .gpx import build_gpx
@@ -26,12 +27,12 @@ STATIC_DIR = pathlib.Path(__file__).parent / "static"
 DISPLAY_SIMPLIFY = 0.001
 
 
-class RouteRequest(BaseModel):
-    waypoints: list[tuple[float, float]]
+class ToggleRequest(BaseModel):
+    code: str
 
 
-class ExportRequest(BaseModel):
-    waypoints: list[tuple[float, float]]
+class TrackRequest(BaseModel):
+    points: list[tuple[float, float]]
     name: str = "Postcodejager route"
 
 
@@ -119,18 +120,41 @@ def create_app(
     def collected():
         return {"collected": sorted(store.get_collected())}
 
-    @app.post("/api/route")
-    def plan_route(req: RouteRequest):
+    # --- planned selection (postcodes to include in the next route) -------
+    @app.get("/api/planned")
+    def planned():
+        return {"planned": sorted(store.get_planned())}
+
+    @app.post("/api/planned/toggle")
+    def planned_toggle(req: ToggleRequest):
+        return {"planned": sorted(store.toggle_planned(req.code))}
+
+    @app.post("/api/planned/clear")
+    def planned_clear():
+        store.clear_planned()
+        return {"planned": []}
+
+    @app.post("/api/route/auto")
+    def route_auto():
+        idx = index_provider()
+        planned = [c for c in store.get_planned() if c in idx.codes()]
+        if len(planned) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Selecteer minstens 2 postcodes voor een route",
+            )
+        ordered = planning_mod.order_nearest_neighbour(
+            [idx.centroid(c) for c in planned]
+        )
         try:
             result = routing_mod.route(
-                req.waypoints,
+                ordered,
                 base_url=settings.brouter_base_url,
                 profile=settings.brouter_profile,
             )
         except Exception as exc:  # surface routing failures to the UI
             raise HTTPException(status_code=502, detail=f"Routeren mislukt: {exc}")
-        collected = store.get_collected()
-        new = routing_mod.new_postcodes(result.points, index_provider(), collected)
+        new = routing_mod.new_postcodes(result.points, idx, store.get_collected())
         line = {
             "type": "Feature",
             "properties": {},
@@ -144,19 +168,12 @@ def create_app(
             "distance_m": result.distance_m,
             "new_count": len(new),
             "new_codes": sorted(new),
+            "selected_count": len(planned),
         }
 
-    @app.post("/api/export")
-    def export(req: ExportRequest):
-        try:
-            result = routing_mod.route(
-                req.waypoints,
-                base_url=settings.brouter_base_url,
-                profile=settings.brouter_profile,
-            )
-        except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"Routeren mislukt: {exc}")
-        xml = build_gpx(result.points, req.name)
+    @app.post("/api/export/track")
+    def export_track(req: TrackRequest):
+        xml = build_gpx(req.points, req.name)
         return Response(
             content=xml,
             media_type="application/gpx+xml",

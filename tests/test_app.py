@@ -69,15 +69,26 @@ def test_collected_endpoint(tmp_path):
     assert c.get("/api/collected").json()["collected"] == ["1011"]
 
 
-def test_route_counts_new_postcodes(tmp_path):
+def test_planned_toggle_get_clear(tmp_path):
     c, _ = make(tmp_path)
-    # assert_all_mocked=False lets the TestClient->app request pass through while
-    # the app's internal BRouter call is mocked.
+    assert c.get("/api/planned").json()["planned"] == []
+    assert c.post("/api/planned/toggle", json={"code": "1011"}).json()["planned"] == ["1011"]
+    c.post("/api/planned/toggle", json={"code": "1012"})
+    assert c.get("/api/planned").json()["planned"] == ["1011", "1012"]
+    c.post("/api/planned/toggle", json={"code": "1011"})  # toggle off
+    assert c.get("/api/planned").json()["planned"] == ["1012"]
+    c.post("/api/planned/clear")
+    assert c.get("/api/planned").json()["planned"] == []
+
+
+def test_route_auto_through_selected(tmp_path):
+    c, store = make(tmp_path)
+    store.set_planned({"1011", "1012"})
     with respx.mock(assert_all_mocked=False) as router:
         router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
             return_value=httpx.Response(200, json=BROUTER_GEOJSON)
         )
-        r = c.post("/api/route", json={"waypoints": [[52.37, 4.905], [52.37, 4.935]]})
+        r = c.post("/api/route/auto")
     assert r.status_code == 200
     body = r.json()
     assert body["new_count"] == 2
@@ -85,16 +96,18 @@ def test_route_counts_new_postcodes(tmp_path):
     assert body["distance_m"] == 3500.0
 
 
-def test_export_returns_gpx_attachment(tmp_path):
+def test_route_auto_requires_at_least_two(tmp_path):
+    c, store = make(tmp_path)
+    store.set_planned({"1011"})
+    assert c.post("/api/route/auto").status_code == 400
+
+
+def test_export_track_returns_gpx(tmp_path):
     c, _ = make(tmp_path)
-    with respx.mock(assert_all_mocked=False) as router:
-        router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
-            return_value=httpx.Response(200, json=BROUTER_GEOJSON)
-        )
-        r = c.post(
-            "/api/export",
-            json={"waypoints": [[52.37, 4.905], [52.37, 4.935]], "name": "Rit"},
-        )
+    r = c.post(
+        "/api/export/track",
+        json={"points": [[52.37, 4.90], [52.38, 4.91]], "name": "Rit"},
+    )
     assert r.status_code == 200
     assert "<gpx" in r.text
     assert "attachment" in r.headers.get("content-disposition", "")

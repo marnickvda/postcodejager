@@ -52,14 +52,18 @@
 
       <section class="card">
         <div class="row">
-          <span class="label">Route plannen</span>
-          <span id="wp-count" class="muted">0 punten</span>
+          <span class="label">Selectie</span>
+          <span id="sel-count" class="muted" role="status" aria-live="polite">
+            0 geselecteerd
+          </span>
         </div>
-        <p class="hint">Klik op de kaart om waypoints te plaatsen. Sleep om te verschuiven.</p>
-        <div class="btn-grid">
-          <button id="route-btn" class="btn" type="button">Bereken route</button>
-          <button id="clear-btn" class="btn btn-ghost" type="button">Wis punten</button>
-        </div>
+        <p class="hint">
+          Klik postcodes op de kaart om ze mee te nemen. Nog eens klikken haalt ze
+          weg.
+        </p>
+        <ul id="sel-list" class="chips" aria-label="Geselecteerde postcodes"></ul>
+        <button id="route-btn" class="btn btn-primary" type="button">Bereken route</button>
+        <button id="clear-btn" class="btn btn-ghost" type="button">Wis selectie</button>
         <div id="route-result" class="result hidden">
           <div class="row">
             <span class="label">Afstand</span><span id="route-distance">–</span>
@@ -68,9 +72,7 @@
             <span class="label">Nieuwe postcodes</span>
             <span id="route-new" class="pill pill-new">–</span>
           </div>
-          <button id="export-btn" class="btn btn-primary" type="button">
-            Exporteer GPX
-          </button>
+          <button id="export-btn" class="btn" type="button">Exporteer GPX</button>
         </div>
       </section>
 

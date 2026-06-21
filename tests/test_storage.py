@@ -23,6 +23,18 @@ def test_last_sync(tmp_path):
     assert s.get_last_sync() == 1700
 
 
+def test_planned_toggle_and_clear(tmp_path):
+    s = Store(str(tmp_path / "db.sqlite"))
+    assert s.get_planned() == set()
+    s.toggle_planned("1011")
+    s.toggle_planned("1012")
+    assert s.get_planned() == {"1011", "1012"}
+    s.toggle_planned("1011")  # toggle off
+    assert s.get_planned() == {"1012"}
+    s.clear_planned()
+    assert s.get_planned() == set()
+
+
 def test_activity_ids(tmp_path):
     s = Store(str(tmp_path / "db.sqlite"))
     s.mark_activity(1)

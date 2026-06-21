@@ -46,6 +46,22 @@ class Store:
     def get_collected(self) -> set[str]:
         return set(self._get("collected") or [])
 
+    # --- planned set (postcodes selected for the next route) --------------
+    def get_planned(self) -> set[str]:
+        return set(self._get("planned") or [])
+
+    def set_planned(self, codes: set[str]) -> None:
+        self._set("planned", sorted(set(codes)))
+
+    def toggle_planned(self, code: str) -> set[str]:
+        planned = self.get_planned()
+        planned.discard(code) if code in planned else planned.add(code)
+        self.set_planned(planned)
+        return planned
+
+    def clear_planned(self) -> None:
+        self._set("planned", [])
+
     # --- last sync timestamp ----------------------------------------------
     def set_last_sync(self, epoch: int) -> None:
         self._set("last_sync", int(epoch))

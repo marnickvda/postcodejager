@@ -244,7 +244,9 @@ body {
 
 .provinces summary::before {
   content: "▸";
-  font-size: 10px;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--orange);
   transition: transform 0.15s ease;
 }
 
@@ -336,8 +338,9 @@ body {
 }
 
 .stat-value-sm {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
+  color: var(--ink);
 }
 
 .stat {
@@ -347,9 +350,9 @@ body {
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 18px;
   font-weight: 700;
-  color: var(--orange-dark);
+  color: var(--ink);
 }
 
 .stat-label {

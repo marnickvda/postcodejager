@@ -16,9 +16,9 @@ variable "dns_zone" {
 }
 
 variable "subdomain" {
-  description = "Record name within the zone, e.g. postcodejager (=> postcodejager.example.com)."
+  description = "Record name in the zone. Use \"@\" for the apex (e.g. postcodejager.nl), or \"www\"."
   type        = string
-  default     = "postcodejager"
+  default     = "@"
 }
 
 variable "ssh_public_key" {

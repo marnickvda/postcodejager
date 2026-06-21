@@ -5,5 +5,5 @@ output "server_ipv4" {
 
 output "fqdn" {
   description = "Full hostname the app is reachable at."
-  value       = "${var.subdomain}.${var.dns_zone}"
+  value       = var.subdomain == "@" ? var.dns_zone : "${var.subdomain}.${var.dns_zone}"
 }

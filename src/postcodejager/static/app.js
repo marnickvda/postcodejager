@@ -43,7 +43,14 @@ async function postJSON(url, obj) {
 }
 
 // === Map setup ===============================================================
-const map = L.map("map").setView([52.1, 5.1], 8); // centered on the Netherlands
+// Limit the map to the Netherlands plus a little margin: no panning/zooming out
+// to the rest of the world, and no tile requests beyond this box.
+const NL_BOUNDS = L.latLngBounds([50.4, 2.8], [53.9, 7.6]);
+const map = L.map("map", {
+  maxBounds: NL_BOUNDS,
+  maxBoundsViscosity: 1.0,
+  minZoom: 7,
+}).setView([52.1, 5.1], 8);
 
 // CARTO basemaps: clean, free, no API key. Swap "voyager" for positron /
 // dark_matter to change the look. https://leaflet-extras.github.io/leaflet-providers/preview/
@@ -52,6 +59,7 @@ L.tileLayer(
   {
     subdomains: "abcd",
     maxZoom: 20,
+    bounds: NL_BOUNDS,
     attribution:
       '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, © <a href="https://carto.com/attributions">CARTO</a>',
   }
@@ -89,7 +97,7 @@ welcome.innerHTML =
   "<p>Verbind je Strava om te zien welke postcodes je al hebt gereden. Alles blijft lokaal in deze browser.</p>" +
   '<a id="connect-btn" class="btn btn-strava" href="/auth/login">Verbind met Strava</a>' +
   '<ol class="welcome-steps">' +
-  "<li>Verbind Strava — je ritten laden automatisch in.</li>" +
+  "<li>Verbind Strava: je ritten laden automatisch in.</li>" +
   "<li>Klik postcodes, of sleep met Shift een gebied, om mee te nemen.</li>" +
   "<li>Bereken een route en exporteer de GPX.</li>" +
   "</ol></div>";
@@ -133,7 +141,7 @@ function featureLabel(f) {
     : collectedSet.has(code)
       ? "afgevinkt"
       : "open";
-  return `${code} — ${state}`;
+  return `${code} · ${state}`;
 }
 
 const fmtPct = (n) =>
@@ -303,7 +311,7 @@ async function updateImpact() {
     return;
   }
   box.querySelector(".impact-main").textContent =
-    `+${fmtPct(d.increase)}% — van ${fmtPct(d.current_percent)}% naar ${fmtPct(d.projected_percent)}%`;
+    `+${fmtPct(d.increase)}% (van ${fmtPct(d.current_percent)}% naar ${fmtPct(d.projected_percent)}%)`;
   box.querySelector(".impact-provs").textContent = d.provinces
     .map((p) => `${p.name} +${fmtPct(p.increase)}%`)
     .join(" · ");

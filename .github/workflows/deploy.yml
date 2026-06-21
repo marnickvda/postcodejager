@@ -20,9 +20,10 @@ jobs:
       - name: Require deploy config
         env:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
-          if [ -z "$SERVER_HOST" ]; then
-            echo "::error::SERVER_HOST secret not set — follow deploy/README.md (provision the server + add the GitHub secrets) first."
+          if [ -z "$SERVER_IP" ] || [ -z "$SERVER_HOST" ]; then
+            echo "::error::Set the SERVER_IP and SERVER_HOST secrets first (see deploy/README.md)."
             exit 1
           fi
 
@@ -34,22 +35,25 @@ jobs:
       - name: Set up SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_IP: ${{ secrets.SERVER_IP }}
         run: |
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
-          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -H "$SERVER_IP" >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy
+        # SSH to the server by IP (no DNS dependency); the domain is only used
+        # for Caddy's HTTPS site + the Strava redirect URI.
         env:
+          SERVER_IP: ${{ secrets.SERVER_IP }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           REPO: ${{ github.repository }}
           REF: ${{ github.ref_name }}
         run: |
-          ansible-playbook -i "$SERVER_HOST," \
+          ansible-playbook -i "$SERVER_IP," \
             deploy/ansible/playbook.yml \
             --private-key ~/.ssh/id_deploy \
             -u root \

@@ -65,8 +65,9 @@ Repo → Settings → Secrets and variables → Actions → New repository secre
 
 | Secret | Value |
 |---|---|
-| `SSH_PRIVATE_KEY` | contents of `~/.ssh/postcodejager` (the private key) |
-| `SERVER_HOST` | the `fqdn` from step 2 |
+| `SSH_PRIVATE_KEY` | the private key matching the server's SSH key |
+| `SERVER_IP` | `server_ipv4` from step 2 (SSH target; no DNS dependency) |
+| `SERVER_HOST` | `fqdn` from step 2, e.g. `postcodejager.nl` (domain for HTTPS) |
 | `STRAVA_CLIENT_ID` | your Strava client id |
 | `STRAVA_CLIENT_SECRET` | your Strava client secret |
 

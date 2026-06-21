@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 
 from postcodejager.app import create_app
 from postcodejager.config import load_settings
+from postcodejager.gpx import build_gpx
 from postcodejager.postcodes import PC4Index
 from postcodejager.storage import Store
 
@@ -100,6 +101,29 @@ def test_route_auto_requires_at_least_two(tmp_path):
     c, store = make(tmp_path)
     store.set_planned({"1011"})
     assert c.post("/api/route/auto").status_code == 400
+
+
+def test_import_gpx_counts_new_postcodes(tmp_path):
+    c, store = make(tmp_path)
+    gpx = build_gpx([(52.37, 4.905), (52.37, 4.935)], "Rit")  # crosses 1011 & 1012
+    body = c.post(
+        "/api/import/gpx", content=gpx, headers={"Content-Type": "application/gpx+xml"}
+    ).json()
+    assert body["new_count"] == 2
+    assert body["new_codes"] == ["1011", "1012"]
+
+    store.set_collected({"1011"})  # now only 1012 is new
+    body2 = c.post(
+        "/api/import/gpx", content=gpx, headers={"Content-Type": "application/gpx+xml"}
+    ).json()
+    assert body2["new_count"] == 1
+    assert body2["new_codes"] == ["1012"]
+    assert body2["already_count"] == 1
+
+
+def test_import_gpx_rejects_garbage(tmp_path):
+    c, _ = make(tmp_path)
+    assert c.post("/api/import/gpx", content="not gpx").status_code == 400
 
 
 def test_export_track_returns_gpx(tmp_path):

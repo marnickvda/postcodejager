@@ -80,6 +80,32 @@
         </div>
       </section>
 
+      <section class="card">
+        <div class="row">
+          <span class="label">Route importeren</span>
+        </div>
+        <p class="hint">
+          Importeer een GPX om meteen te zien hoeveel nieuwe postcodes hij pakt.
+        </p>
+        <input
+          id="gpx-input"
+          type="file"
+          accept=".gpx,application/gpx+xml"
+          class="hidden"
+        />
+        <button id="import-btn" class="btn" type="button">Kies GPX-bestand…</button>
+        <div id="import-result" class="result hidden">
+          <div class="row">
+            <span class="label">Nieuwe postcodes</span>
+            <span id="import-new" class="pill pill-new">–</span>
+          </div>
+          <div class="row">
+            <span class="label">Totaal geraakt</span>
+            <span id="import-crossed" class="muted">–</span>
+          </div>
+        </div>
+      </section>
+
       <p id="message" class="message hidden"></p>
 
       <footer class="attribution">

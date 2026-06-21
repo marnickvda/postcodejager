@@ -21,6 +21,7 @@ L.tileLayer(
 
 let pc4Layer = null;
 let routeLayer = null;
+let importedLayer = null; // an imported GPX route drawn on the map
 let collectedSet = new Set(); // PC4 codes already ridden (from Strava)
 let selectedSet = new Set(); // PC4 codes selected to include in the next route
 const selMarkers = {}; // code -> checkmark marker
@@ -365,11 +366,47 @@ async function exportGpx() {
   }
 }
 
+// Import a GPX route and immediately report how many new postcodes it covers.
+async function onGpxChosen(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  clearMessage();
+  try {
+    const res = await fetch("/api/import/gpx", {
+      method: "POST",
+      headers: { "Content-Type": "application/gpx+xml" },
+      body: await file.text(),
+    });
+    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+    const data = await res.json();
+    if (importedLayer) map.removeLayer(importedLayer);
+    importedLayer = L.geoJSON(data.geojson, {
+      style: { color: "#7b1fa2", weight: 4, opacity: 0.9, dashArray: "6 5" },
+    }).addTo(map);
+    const bounds = importedLayer.getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
+    document.getElementById("import-new").textContent = data.new_count + " nieuw";
+    document.getElementById("import-crossed").textContent =
+      data.crossed_count + " postcodes";
+    document.getElementById("import-result").classList.remove("hidden");
+    const codes = data.new_count ? ": " + data.new_codes.join(", ") : "";
+    showMessage(`Deze route pakt ${data.new_count} nieuwe postcodes${codes}.`);
+  } catch (err) {
+    showMessage(`Import mislukt: ${err.message}`, true);
+  } finally {
+    e.target.value = ""; // allow re-importing the same file
+  }
+}
+
 // --- wire up ----------------------------------------------------------------
 document.getElementById("refresh-btn").addEventListener("click", () => sync());
 document.getElementById("route-btn").addEventListener("click", computeRoute);
 document.getElementById("clear-btn").addEventListener("click", clearSelection);
 document.getElementById("export-btn").addEventListener("click", exportGpx);
+document
+  .getElementById("import-btn")
+  .addEventListener("click", () => document.getElementById("gpx-input").click());
+document.getElementById("gpx-input").addEventListener("change", onGpxChosen);
 
 loadCollected()
   .then(loadGeometry)

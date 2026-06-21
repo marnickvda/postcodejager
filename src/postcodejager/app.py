@@ -2,7 +2,7 @@
 import pathlib
 import time
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (
     FileResponse,
@@ -17,7 +17,7 @@ from . import coverage as coverage_mod
 from . import planning as planning_mod
 from . import routing as routing_mod
 from .config import Settings
-from .gpx import build_gpx
+from .gpx import build_gpx, parse_gpx_points
 from .storage import Store
 from .strava import StravaClient, build_authorize_url
 
@@ -172,6 +172,35 @@ def create_app(
             "new_count": len(new),
             "new_codes": sorted(new),
             "selected_count": len(planned),
+        }
+
+    @app.post("/api/import/gpx")
+    async def import_gpx(request: Request):
+        text = (await request.body()).decode("utf-8", errors="replace")
+        try:
+            points = parse_gpx_points(text)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Kon GPX niet lezen: {exc}")
+        if len(points) < 2:
+            raise HTTPException(status_code=400, detail="Geen route gevonden in GPX")
+        idx = index_provider()
+        crossed = coverage_mod.collected_from_tracks([points], idx)
+        collected = store.get_collected()
+        new = sorted(crossed - collected)
+        line = {
+            "type": "Feature",
+            "properties": {},
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[lon, lat] for lat, lon in points],
+            },
+        }
+        return {
+            "new_count": len(new),
+            "new_codes": new,
+            "crossed_count": len(crossed),
+            "already_count": len(crossed & collected),
+            "geojson": line,
         }
 
     @app.post("/api/export/track")

@@ -4,6 +4,7 @@ GeoJSON coordinates are ``[lon, lat]``; this module's public API takes and
 returns ``(lat, lon)`` to match the rest of the codebase.
 """
 import json
+import math
 
 from shapely.geometry import Point, mapping, shape
 from shapely.ops import nearest_points
@@ -11,6 +12,11 @@ from shapely.strtree import STRtree
 
 # Property keys that may hold the 4-digit code across data sources.
 CODE_PROP_CANDIDATES = ("postcode", "pc4", "pc4_code", "PC4", "postcode4")
+
+# How far inside an area we aim to route, so a leg dips meaningfully into the
+# postcode instead of clipping its edge. Capped by how deep the area allows.
+MIN_ENTRY_DEPTH_M = 1000.0
+_M_PER_DEG_LAT = 111_320.0  # metres per degree of latitude (≈constant)
 
 
 def _code_of(props: dict) -> str:
@@ -75,22 +81,32 @@ class PC4Index:
     def entry_point(
         self, code: str, target: tuple[float, float]
     ) -> tuple[float, float]:
-        """A point inside area ``code`` near the route corridor ``target``.
+        """A point well inside area ``code`` near the route corridor ``target``.
 
-        ``target`` is a ``(lat, lon)`` hint for where the route passes. The route
-        only needs to touch the area, so instead of its centre we return the
-        point closest to ``target`` nudged just inside the edge — large areas get
-        clipped at the boundary instead of forcing a deep detour to the middle.
+        ``target`` is a ``(lat, lon)`` hint for where the route passes. We aim
+        for the closest point to that corridor that still lies at least
+        ``MIN_ENTRY_DEPTH_M`` from the boundary, so each leg dips meaningfully
+        into the postcode instead of clipping its edge — while staying on the
+        corridor side rather than detouring to the centre. Areas too small to
+        hold such a point fall back to going as deep as they allow.
         """
         poly = self._polys[code]
         tp = Point(target[1], target[0])
-        if poly.contains(tp):
-            return (target[0], target[1])
-        near = nearest_points(poly, tp)[0]  # boundary point closest to target
-        rep = poly.representative_point()  # a point guaranteed inside
-        x = near.x + 0.25 * (rep.x - near.x)
-        y = near.y + 0.25 * (rep.y - near.y)
-        return (y, x)
+        # Express the target depth in degrees using the (shorter) longitude
+        # scale, so the guaranteed clearance is at least MIN_ENTRY_DEPTH_M in
+        # every direction. Buffering inward shrinks the area by that band; any
+        # point left inside is then >= the target depth from the edge.
+        m_per_deg = _M_PER_DEG_LAT * math.cos(math.radians(target[0]))
+        depth_deg = MIN_ENTRY_DEPTH_M / m_per_deg
+        inner = poly.buffer(-depth_deg)
+        # Thin areas can't hold a 1 km-deep point; relax until something is left.
+        while inner.is_empty and depth_deg > 1e-5:
+            depth_deg /= 2
+            inner = poly.buffer(-depth_deg)
+        if inner.is_empty:
+            return self.centroid(code)  # degenerate sliver: best-effort interior
+        p = nearest_points(inner, tp)[0]  # deepest-enough point nearest the corridor
+        return (p.y, p.x)
 
     def codes_by_province(self) -> dict[str, set[str]]:
         out: dict[str, set[str]] = {}

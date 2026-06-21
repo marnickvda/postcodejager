@@ -186,21 +186,16 @@ body {
   border-color: var(--orange-dark);
 }
 
-.btn-strava {
-  background: #fc4c02;
-  border-color: #fc4c02;
-  color: #fff;
+/* Official "Connect with Strava" button (their artwork; don't restyle it). */
+.strava-connect {
+  display: inline-block;
+  line-height: 0;
 }
 
-.btn-strava:hover {
-  background: #e34402;
-}
-
-/* The welcome overlay sits inside the Leaflet container, whose
-   `.leaflet-container a` rule would otherwise tint this link-button blue. */
-#welcome .btn-strava,
-#welcome .btn-strava:visited {
-  color: #fff;
+.strava-connect img {
+  display: block;
+  height: 48px;
+  width: auto;
 }
 
 .btn-ghost {
@@ -651,10 +646,6 @@ kbd {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.5;
-}
-
-.welcome-card .btn-strava {
-  width: 100%;
 }
 
 .welcome-steps {

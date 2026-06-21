@@ -95,7 +95,7 @@ welcome.innerHTML =
   '<img src="/static/icon.svg" width="40" height="40" alt="" />' +
   "<h2>Welkom bij Postcodejager</h2>" +
   "<p>Verbind je Strava om te zien welke postcodes je al hebt gereden. Alles blijft lokaal in deze browser.</p>" +
-  '<a id="connect-btn" class="btn btn-strava" href="/auth/login">Connect with Strava</a>' +
+  '<a id="connect-btn" class="strava-connect" href="/auth/login"><img src="/static/strava-connect.svg" alt="Connect with Strava" /></a>' +
   '<ol class="welcome-steps">' +
   "<li>Verbind Strava: je ritten laden automatisch in.</li>" +
   "<li>Klik postcodes, of sleep met Shift een gebied, om mee te nemen.</li>" +

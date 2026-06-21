@@ -2,8 +2,9 @@ name: Deploy
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:
+    tags:
+      - "v*" # deploy on a version tag, e.g. v1.0.0
+  workflow_dispatch: # or trigger manually from the Actions tab
 
 # Never run two deploys at once.
 concurrency:
@@ -46,12 +47,14 @@ jobs:
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
           REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
         run: |
           ansible-playbook -i "$SERVER_HOST," \
             deploy/ansible/playbook.yml \
             --private-key ~/.ssh/id_deploy \
             -u root \
             -e "repo_url=https://github.com/$REPO.git" \
+            -e "branch=$REF" \
             -e "domain=$SERVER_HOST" \
             -e "strava_client_id=$STRAVA_CLIENT_ID" \
             -e "strava_client_secret=$STRAVA_CLIENT_SECRET"

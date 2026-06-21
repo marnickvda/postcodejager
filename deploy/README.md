@@ -72,10 +72,17 @@ Repo → Settings → Secrets and variables → Actions → New repository secre
 
 ## 6. Deploy
 
-Push to `main` (or run the **Deploy** workflow manually). GitHub Actions runs the
-Ansible playbook against the server: clone/pull, install, fetch PC4 data on first
-run, (re)start the service, configure Caddy. The first run also issues the HTTPS
-certificate, so finish step 3 and wait for DNS to resolve first.
+Deploys run on a **version tag** (not on every push). To release:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Or trigger the **Deploy** workflow manually from the Actions tab. GitHub Actions
+runs the Ansible playbook against the server: clone the tagged code, install,
+fetch PC4 data on first run, (re)start the service, configure Caddy. The first
+run also issues the HTTPS certificate, so finish step 3 and let DNS resolve first.
 
 Open `https://<fqdn>` and connect Strava.
 

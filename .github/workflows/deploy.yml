@@ -16,6 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Require deploy config
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          if [ -z "$SERVER_HOST" ]; then
+            echo "::error::SERVER_HOST secret not set — follow deploy/README.md (provision the server + add the GitHub secrets) first."
+            exit 1
+          fi
+
       - name: Install Ansible
         run: |
           pipx install ansible-core

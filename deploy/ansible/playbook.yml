@@ -107,10 +107,15 @@
         chdir: "{{ app_dir }}"
       notify: restart app
 
+    # Root-owned (the app user can't tamper with it) but group-readable, since
+    # the app reads .env itself (config.apply_dotenv) as {{ app_user }} on top
+    # of systemd's EnvironmentFile. 0640 keeps the Strava secret off world-read.
     - name: Write .env
       ansible.builtin.template:
         src: env.j2
         dest: "{{ app_dir }}/.env"
+        owner: root
+        group: "{{ app_user }}"
         mode: "0640"
       notify: restart app
 

@@ -1,14 +1,52 @@
 "use strict";
 
-// --- map setup --------------------------------------------------------------
+// === Local-first state =======================================================
+// Everything personal (token, collected postcodes, selection) lives here, in
+// the browser. The backend is stateless; it only does compute.
+function lsGet(key, fallback) {
+  try {
+    const v = localStorage.getItem("pcj." + key);
+    return v == null ? fallback : JSON.parse(v);
+  } catch {
+    return fallback;
+  }
+}
+function lsSet(key, val) {
+  localStorage.setItem("pcj." + key, JSON.stringify(val));
+}
+function lsDel(key) {
+  localStorage.removeItem("pcj." + key);
+}
+
+let token = lsGet("token", null); // {access_token, refresh_token, expires_at}
+let collectedSet = new Set(lsGet("collected", [])); // PC4 already ridden
+let selectedSet = new Set(lsGet("planned", [])); // PC4 selected for a route
+let lastSync = lsGet("lastSync", null); // epoch seconds
+let totalPc4 = 0; // number of PC4 areas (from the geometry)
+
+function saveToken(t) {
+  token = t || null;
+  if (t) lsSet("token", t);
+  else lsDel("token");
+}
+const saveCollected = () => lsSet("collected", [...collectedSet]);
+const savePlanned = () => lsSet("planned", [...selectedSet]);
+
+async function postJSON(url, obj) {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(obj),
+  });
+  if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
+  return res.json();
+}
+
+// === Map setup ===============================================================
 const map = L.map("map").setView([52.1, 5.1], 8); // centered on the Netherlands
 
-// CARTO basemaps: clean, free, no API key — a calm backdrop makes the colored
-// postcode overlay pop. Swap "voyager" for an alternative to change the look:
-//   voyager      — light, modern, with labels (default)
-//   positron     — very light grey, minimal (max overlay contrast)
-//   dark_matter  — dark theme
-// Browse more styles at https://leaflet-extras.github.io/leaflet-providers/preview/
+// CARTO basemaps: clean, free, no API key. Swap "voyager" for positron /
+// dark_matter to change the look. https://leaflet-extras.github.io/leaflet-providers/preview/
 L.tileLayer(
   "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
   {
@@ -21,12 +59,10 @@ L.tileLayer(
 
 let pc4Layer = null;
 let routeLayer = null;
-let importedLayer = null; // an imported GPX route drawn on the map
-let collectedSet = new Set(); // PC4 codes already ridden (from Strava)
-let selectedSet = new Set(); // PC4 codes selected to include in the next route
+let importedLayer = null;
 const selMarkers = {}; // code -> checkmark marker
-let lastRoutePoints = null; // [[lat,lon],...] of the last computed route
-let lastClearedSelection = null; // snapshot for "undo clear"
+let lastRoutePoints = null;
+let lastClearedSelection = null;
 
 // --- map legend (static content) --------------------------------------------
 const legend = L.control({ position: "bottomleft" });
@@ -42,7 +78,7 @@ legend.onAdd = () => {
 };
 legend.addTo(map);
 
-// --- first-run welcome overlay (static content; connect button lives here) ---
+// --- first-run welcome overlay (connect button lives here) ------------------
 const welcome = document.createElement("div");
 welcome.id = "welcome";
 welcome.className = "welcome hidden";
@@ -50,7 +86,7 @@ welcome.innerHTML =
   '<div class="welcome-card">' +
   '<img src="/static/icon.svg" width="40" height="40" alt="" />' +
   "<h2>Welkom bij Postcodejager</h2>" +
-  "<p>Verbind je Strava om te zien welke postcodes je al hebt gereden.</p>" +
+  "<p>Verbind je Strava om te zien welke postcodes je al hebt gereden. Alles blijft lokaal in deze browser.</p>" +
   '<a id="connect-btn" class="btn btn-strava" href="/auth/login">Verbind met Strava</a>' +
   '<ol class="welcome-steps">' +
   "<li>Verbind Strava — je ritten laden automatisch in.</li>" +
@@ -59,28 +95,25 @@ welcome.innerHTML =
   "</ol></div>";
 map.getContainer().appendChild(welcome);
 
-// --- map loading indicator (shown until the PC4 layer is rendered) ----------
+// --- map loading indicator --------------------------------------------------
 const mapLoading = document.createElement("div");
 mapLoading.className = "map-loading";
 mapLoading.innerHTML = '<span class="mini-spin"></span>Postcodes laden…';
 map.getContainer().appendChild(mapLoading);
 
-// --- helpers ----------------------------------------------------------------
+// === Helpers =================================================================
 function showMessage(text, isError) {
   const el = document.getElementById("message");
   el.textContent = text;
   el.classList.toggle("error", !!isError);
   el.classList.remove("hidden");
 }
-
 function clearMessage() {
   document.getElementById("message").classList.add("hidden");
 }
 
 function pc4Style(feature) {
   const code = feature.properties.postcode;
-  // Selected is the actionable state, so it gets the strongest treatment
-  // (and a checkmark marker — never color alone).
   if (selectedSet.has(code)) {
     return { color: "#e85d0a", weight: 3, fillColor: "#ff6a13", fillOpacity: 0.55 };
   }
@@ -93,35 +126,6 @@ function pc4Style(feature) {
   };
 }
 
-// --- data loading -----------------------------------------------------------
-async function loadStatus() {
-  const res = await fetch("/api/status");
-  const s = await res.json();
-  const pill = document.getElementById("conn-status");
-  pill.textContent = s.connected ? "verbonden" : "niet verbonden";
-  pill.className = "pill " + (s.connected ? "pill-on" : "pill-off");
-  // When connected: hide the welcome overlay + connect button, show refresh.
-  document.getElementById("welcome").classList.toggle("hidden", s.connected);
-  document.getElementById("connect-btn").classList.toggle("hidden", s.connected);
-  document.getElementById("refresh-btn").classList.toggle("hidden", !s.connected);
-  document.getElementById("collected-count").textContent = s.collected_count;
-  document.getElementById("total-count").textContent = s.total_count;
-  const pct = s.total_count ? (s.collected_count / s.total_count) * 100 : 0;
-  document.getElementById("percent").textContent =
-    pct.toLocaleString("nl-NL", {
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-    }) + "%";
-  document.getElementById("bar-fill").style.transform = "scaleX(" + pct / 100 + ")";
-  document.getElementById("last-sync").textContent = s.last_sync
-    ? new Date(s.last_sync * 1000).toLocaleDateString("nl-NL")
-    : "nooit";
-  return s;
-}
-
-// Custom hover hint: a plain DOM element we fully control. Leaflet's own
-// tooltips get left "stuck" when a mouseout is missed during zoom/pan/resize;
-// toggling display on our own element can never get stuck.
 function featureLabel(f) {
   const code = f.properties.postcode;
   const state = selectedSet.has(code)
@@ -132,6 +136,29 @@ function featureLabel(f) {
   return `${code} — ${state}`;
 }
 
+const fmtPct = (n) =>
+  n.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+// === Status / connection (rendered from local state) =========================
+function renderStatus() {
+  const connected = !!token;
+  const pill = document.getElementById("conn-status");
+  pill.textContent = connected ? "verbonden" : "niet verbonden";
+  pill.className = "pill " + (connected ? "pill-on" : "pill-off");
+  document.getElementById("welcome").classList.toggle("hidden", connected);
+  document.getElementById("connect-btn").classList.toggle("hidden", connected);
+  document.getElementById("refresh-btn").classList.toggle("hidden", !connected);
+  document.getElementById("collected-count").textContent = collectedSet.size;
+  document.getElementById("total-count").textContent = totalPc4 || "–";
+  const pct = totalPc4 ? (collectedSet.size / totalPc4) * 100 : 0;
+  document.getElementById("percent").textContent = fmtPct(pct) + "%";
+  document.getElementById("bar-fill").style.transform = "scaleX(" + pct / 100 + ")";
+  document.getElementById("last-sync").textContent = lastSync
+    ? new Date(lastSync * 1000).toLocaleDateString("nl-NL")
+    : "nooit";
+}
+
+// === Hover hint (own element; never gets stuck) ==============================
 const hint = document.createElement("div");
 hint.className = "hover-hint";
 hint.style.display = "none";
@@ -143,21 +170,17 @@ function showHint(containerPoint, text) {
   hint.style.top = containerPoint.y - 12 + "px";
   hint.style.display = "block";
 }
-
 function hideHint() {
   hint.style.display = "none";
 }
-
-// Any view change or the cursor leaving the map hides the hint.
 map.on("zoomstart movestart", hideHint);
 map.getContainer().addEventListener("mouseleave", hideHint);
 
-// Geometry is fetched once and browser-cached; collected state is small and
-// refreshed on its own, then applied by restyling the existing layer.
+// === Geometry + collected/province rendering =================================
 async function loadGeometry() {
   mapLoading.classList.remove("hidden");
-  const res = await fetch("/api/pc4/geometry");
-  const geo = await res.json();
+  const geo = await (await fetch("/api/pc4/geometry")).json();
+  totalPc4 = geo.features.length;
   if (pc4Layer) map.removeLayer(pc4Layer);
   pc4Layer = L.geoJSON(geo, {
     style: pc4Style,
@@ -170,33 +193,30 @@ async function loadGeometry() {
       });
       layer.on("mouseout", () => {
         hideHint();
-        layer.setStyle(pc4Style(f)); // revert the transient hover highlight
+        layer.setStyle(pc4Style(f));
       });
       layer.on("click", () => toggleSelect(code, layer));
     },
   }).addTo(map);
+  // restore persisted selection markers
+  pc4Layer.eachLayer((l) => {
+    if (selectedSet.has(l.feature.properties.postcode)) addSelMarker(l.feature.properties.postcode, l);
+  });
   mapLoading.classList.add("hidden");
-}
-
-async function loadCollected() {
-  const res = await fetch("/api/collected");
-  const data = await res.json();
-  collectedSet = new Set(data.collected);
-  if (pc4Layer) pc4Layer.setStyle(pc4Style);
-  loadProvinces(); // per-province completion depends on the collected set
+  renderStatus();
+  refreshSelectionUI();
+  loadProvinces();
 }
 
 async function loadProvinces() {
-  const res = await fetch("/api/provinces");
-  const { provinces } = await res.json();
+  const { provinces } = await postJSON("/api/provinces", {
+    collected: [...collectedSet],
+  });
   const list = document.getElementById("prov-list");
   list.innerHTML = "";
-  const fmt = (n) =>
-    n.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   for (const p of provinces) {
     const li = document.createElement("li");
     li.className = "prov-row";
-
     const head = document.createElement("div");
     head.className = "prov-head";
     const name = document.createElement("span");
@@ -204,22 +224,20 @@ async function loadProvinces() {
     name.textContent = p.name;
     const meta = document.createElement("span");
     meta.className = "prov-meta";
-    meta.textContent = `${fmt(p.percent)}% · ${p.collected}/${p.total}`;
+    meta.textContent = `${fmtPct(p.percent)}% · ${p.collected}/${p.total}`;
     head.append(name, meta);
-
     const bar = document.createElement("div");
     bar.className = "bar bar-sm";
     const fill = document.createElement("div");
     fill.className = "bar-fill";
     fill.style.transform = "scaleX(" + p.percent / 100 + ")";
     bar.appendChild(fill);
-
     li.append(head, bar);
     list.appendChild(li);
   }
 }
 
-// --- selection --------------------------------------------------------------
+// === Selection ===============================================================
 function addSelMarker(code, layer) {
   if (selMarkers[code]) return;
   selMarkers[code] = L.marker(layer.getBounds().getCenter(), {
@@ -233,14 +251,12 @@ function addSelMarker(code, layer) {
     keyboard: false,
   }).addTo(map);
 }
-
 function removeSelMarker(code) {
   if (selMarkers[code]) {
     map.removeLayer(selMarkers[code]);
     delete selMarkers[code];
   }
 }
-
 function restyleCode(code) {
   if (!pc4Layer) return;
   pc4Layer.eachLayer((l) => {
@@ -272,64 +288,46 @@ function refreshSelectionUI() {
   updateImpact();
 }
 
-// How much would completing the current selection raise your percentage —
-// overall and per affected province.
 async function updateImpact() {
   const box = document.getElementById("impact");
   if (!selectedSet.size) {
     box.classList.add("hidden");
     return;
   }
-  const d = await (await fetch("/api/selection/impact")).json();
+  const d = await postJSON("/api/selection/impact", {
+    collected: [...collectedSet],
+    planned: [...selectedSet],
+  });
   if (!d.new) {
     box.classList.add("hidden");
     return;
   }
-  const fmt = (n) =>
-    n.toLocaleString("nl-NL", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   box.querySelector(".impact-main").textContent =
-    `+${fmt(d.increase)}% — van ${fmt(d.current_percent)}% naar ${fmt(d.projected_percent)}%`;
+    `+${fmtPct(d.increase)}% — van ${fmtPct(d.current_percent)}% naar ${fmtPct(d.projected_percent)}%`;
   box.querySelector(".impact-provs").textContent = d.provinces
-    .map((p) => `${p.name} +${fmt(p.increase)}%`)
+    .map((p) => `${p.name} +${fmtPct(p.increase)}%`)
     .join(" · ");
   box.classList.remove("hidden");
 }
 
-// The server owns the planned set; we sync our local copy from its response.
-async function persistToggle(code) {
-  const res = await fetch("/api/planned/toggle", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code }),
-  });
-  selectedSet = new Set((await res.json()).planned);
-}
-
-async function toggleSelect(code, layer) {
-  await persistToggle(code);
-  if (selectedSet.has(code)) addSelMarker(code, layer);
-  else removeSelMarker(code);
+function toggleSelect(code, layer) {
+  if (selectedSet.has(code)) {
+    selectedSet.delete(code);
+    removeSelMarker(code);
+  } else {
+    selectedSet.add(code);
+    addSelMarker(code, layer);
+  }
+  savePlanned();
   layer.setStyle(pc4Style(layer.feature));
   refreshSelectionUI();
 }
 
-async function deselectCode(code) {
-  await persistToggle(code); // code was selected, so this removes it
+function deselectCode(code) {
+  selectedSet.delete(code);
+  savePlanned();
   removeSelMarker(code);
   restyleCode(code);
-  refreshSelectionUI();
-}
-
-async function loadPlanned() {
-  const res = await fetch("/api/planned");
-  selectedSet = new Set((await res.json()).planned);
-  if (pc4Layer) {
-    pc4Layer.eachLayer((l) => {
-      const code = l.feature.properties.postcode;
-      if (selectedSet.has(code)) addSelMarker(code, l);
-      l.setStyle(pc4Style(l.feature));
-    });
-  }
   refreshSelectionUI();
 }
 
@@ -342,14 +340,14 @@ function clearRoute() {
   document.getElementById("route-result").classList.add("hidden");
 }
 
-async function clearSelection() {
+function clearSelection() {
   if (!selectedSet.size) return;
   lastClearedSelection = [...selectedSet];
-  await fetch("/api/planned/clear", { method: "POST" });
   Object.keys(selMarkers).forEach(removeSelMarker);
   selectedSet = new Set();
+  savePlanned();
   if (pc4Layer) pc4Layer.setStyle(pc4Style);
-  clearRoute(); // the computed route belonged to the now-cleared selection
+  clearRoute();
   refreshSelectionUI();
   showUndo(`${lastClearedSelection.length} postcodes gewist.`);
 }
@@ -366,35 +364,33 @@ function showUndo(text) {
   el.appendChild(undo);
 }
 
-async function undoClear() {
+function undoClear() {
   if (!lastClearedSelection) return;
-  for (const code of lastClearedSelection) {
-    await fetch("/api/planned/toggle", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code }),
-    });
-  }
+  lastClearedSelection.forEach((c) => selectedSet.add(c));
   lastClearedSelection = null;
-  await loadPlanned();
+  savePlanned();
+  if (pc4Layer)
+    pc4Layer.eachLayer((l) => {
+      const c = l.feature.properties.postcode;
+      if (selectedSet.has(c)) {
+        addSelMarker(c, l);
+        l.setStyle(pc4Style(l.feature));
+      }
+    });
+  refreshSelectionUI();
   clearMessage();
 }
 
 // --- box select (Shift + drag) ----------------------------------------------
-map.boxZoom.disable(); // repurpose Shift+drag from zoom to area-select
+map.boxZoom.disable();
 let boxStart = null;
 let boxRect = null;
-
-function setBoxCursor(on) {
-  map.getContainer().classList.toggle("box-mode", on);
-}
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Shift") setBoxCursor(true);
+  if (e.key === "Shift") map.getContainer().classList.add("box-mode");
 });
 document.addEventListener("keyup", (e) => {
-  if (e.key === "Shift") setBoxCursor(false);
+  if (e.key === "Shift") map.getContainer().classList.remove("box-mode");
 });
-
 map.on("mousedown", (e) => {
   if (!e.originalEvent.shiftKey || !pc4Layer) return;
   hideHint();
@@ -408,50 +404,60 @@ map.on("mousedown", (e) => {
     interactive: false,
   }).addTo(map);
 });
-
 map.on("mousemove", (e) => {
   if (boxStart && boxRect) boxRect.setBounds(L.latLngBounds(boxStart, e.latlng));
 });
-
-map.on("mouseup", async () => {
+map.on("mouseup", () => {
   if (!boxStart) return;
   const bounds = boxRect.getBounds();
   map.removeLayer(boxRect);
   boxRect = null;
   boxStart = null;
   map.dragging.enable();
-  // Add every postcode whose centre falls inside the box (additive).
-  const codes = [];
-  pc4Layer.eachLayer((l) => {
-    if (bounds.contains(l.getBounds().getCenter())) {
-      const code = l.feature.properties.postcode;
-      if (!selectedSet.has(code)) codes.push(code);
-    }
-  });
-  if (codes.length) await boxSelect(codes);
-});
-
-async function boxSelect(codes) {
-  const res = await fetch("/api/planned/add", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ codes }),
-  });
-  selectedSet = new Set((await res.json()).planned);
+  let changed = false;
   pc4Layer.eachLayer((l) => {
     const code = l.feature.properties.postcode;
-    if (selectedSet.has(code)) {
+    if (!selectedSet.has(code) && bounds.contains(l.getBounds().getCenter())) {
+      selectedSet.add(code);
       addSelMarker(code, l);
       l.setStyle(pc4Style(l.feature));
+      changed = true;
     }
   });
-  refreshSelectionUI();
+  if (changed) {
+    savePlanned();
+    refreshSelectionUI();
+  }
+});
+
+// === Strava: connect / sync ==================================================
+async function validAccessToken() {
+  if (!token) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (token.expires_at && token.expires_at <= now + 60 && token.refresh_token) {
+    try {
+      saveToken(await postJSON("/api/strava/refresh", { refresh_token: token.refresh_token }));
+    } catch (e) {
+      showMessage("Token verversen mislukt: " + e.message, true);
+    }
+  }
+  return token ? token.access_token : null;
 }
 
-// --- actions ----------------------------------------------------------------
-// background=true is used for the silent auto-sync on page load: it only
-// surfaces a message when something actually changed (or on error).
+async function handleOAuthRedirect() {
+  const code = new URLSearchParams(location.search).get("code");
+  if (!code) return;
+  try {
+    saveToken(await postJSON("/api/strava/exchange", { code }));
+  } catch (e) {
+    showMessage("Strava-koppeling mislukt: " + e.message, true);
+  }
+  history.replaceState({}, "", "/");
+  renderStatus();
+}
+
 async function sync({ background = false } = {}) {
+  if (!token) return;
   if (!background) clearMessage();
   const btn = document.getElementById("refresh-btn");
   const pill = document.getElementById("conn-status");
@@ -459,23 +465,29 @@ async function sync({ background = false } = {}) {
   btn.disabled = true;
   pill.textContent = "synchroniseren…";
   try {
-    const res = await fetch("/sync", { method: "POST" });
-    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
-    const data = await res.json();
-    await loadStatus(); // resets pill + counts
-    await loadCollected(); // geometry stays cached; just restyle
-    if (!background || data.added > 0) {
-      showMessage(`${data.added} nieuwe ritten verwerkt.`);
+    const at = await validAccessToken();
+    const data = await postJSON("/api/sync", { access_token: at, after: lastSync });
+    data.collected.forEach((c) => collectedSet.add(c));
+    saveCollected();
+    lastSync = Math.max(lastSync || 0, data.latest || 0);
+    lsSet("lastSync", lastSync);
+    if (pc4Layer) pc4Layer.setStyle(pc4Style);
+    renderStatus();
+    loadProvinces();
+    updateImpact();
+    if (!background || data.activities > 0) {
+      showMessage(`${data.activities} nieuwe ritten verwerkt.`);
     }
-  } catch (err) {
-    showMessage(`Sync mislukt: ${err.message}`, true);
-    await loadStatus();
+  } catch (e) {
+    showMessage("Sync mislukt: " + e.message, true);
+    renderStatus();
   } finally {
     btn.classList.remove("spinning");
     btn.disabled = false;
   }
 }
 
+// === Route + GPX =============================================================
 async function computeRoute() {
   clearMessage();
   if (selectedSet.size < 2) {
@@ -486,31 +498,25 @@ async function computeRoute() {
   btn.disabled = true;
   btn.textContent = "Bezig…";
   try {
-    const res = await fetch("/api/route/auto", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ loop: document.getElementById("loop-toggle").checked }),
+    const data = await postJSON("/api/route/auto", {
+      planned: [...selectedSet],
+      collected: [...collectedSet],
+      loop: document.getElementById("loop-toggle").checked,
     });
-    if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
-    const data = await res.json();
     if (routeLayer) map.removeLayer(routeLayer);
     routeLayer = L.geoJSON(data.geojson, {
       style: { color: "#1565c0", weight: 4, opacity: 0.9 },
     }).addTo(map);
-    // remember the snapped route geometry so export needs no re-routing
-    lastRoutePoints = data.geojson.geometry.coordinates.map(([lon, lat]) => [
-      lat,
-      lon,
-    ]);
+    lastRoutePoints = data.geojson.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
     document.getElementById("route-distance").textContent =
       (data.distance_m / 1000).toFixed(1) + " km";
     document.getElementById("route-new").textContent = data.new_count + " nieuw";
     document.getElementById("route-result").classList.remove("hidden");
-  } catch (err) {
-    showMessage(`Routeren mislukt: ${err.message}`, true);
+  } catch (e) {
+    showMessage("Routeren mislukt: " + e.message, true);
   } finally {
     btn.disabled = false;
-    refreshSelectionUI(); // restore the "Bereken route (N)" label
+    refreshSelectionUI();
   }
 }
 
@@ -530,19 +536,17 @@ async function exportGpx() {
       }),
     });
     if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(await res.blob());
     const a = document.createElement("a");
     a.href = url;
     a.download = "postcodejager-route.gpx";
     a.click();
     URL.revokeObjectURL(url);
-  } catch (err) {
-    showMessage(`Export mislukt: ${err.message}`, true);
+  } catch (e) {
+    showMessage("Export mislukt: " + e.message, true);
   }
 }
 
-// Import a GPX route and immediately report how many new postcodes it covers.
 async function onGpxChosen(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -561,16 +565,17 @@ async function onGpxChosen(e) {
     }).addTo(map);
     const bounds = importedLayer.getBounds();
     if (bounds.isValid()) map.fitBounds(bounds, { padding: [24, 24] });
-    document.getElementById("import-new").textContent = data.new_count + " nieuw";
+    const newCodes = data.crossed.filter((c) => !collectedSet.has(c));
+    document.getElementById("import-new").textContent = newCodes.length + " nieuw";
     document.getElementById("import-crossed").textContent =
-      data.crossed_count + " postcodes";
+      data.crossed.length + " postcodes";
     document.getElementById("import-result").classList.remove("hidden");
-    const codes = data.new_count ? ": " + data.new_codes.join(", ") : "";
-    showMessage(`Deze route pakt ${data.new_count} nieuwe postcodes${codes}.`);
+    const codes = newCodes.length ? ": " + newCodes.join(", ") : "";
+    showMessage(`Deze route pakt ${newCodes.length} nieuwe postcodes${codes}.`);
   } catch (err) {
-    showMessage(`Import mislukt: ${err.message}`, true);
+    showMessage("Import mislukt: " + err.message, true);
   } finally {
-    e.target.value = ""; // allow re-importing the same file
+    e.target.value = "";
   }
 }
 
@@ -583,7 +588,7 @@ function clearImport() {
   clearMessage();
 }
 
-// --- wire up ----------------------------------------------------------------
+// === Wire up =================================================================
 document.getElementById("refresh-btn").addEventListener("click", () => sync());
 document.getElementById("route-btn").addEventListener("click", computeRoute);
 document.getElementById("clear-btn").addEventListener("click", clearSelection);
@@ -594,9 +599,8 @@ document
 document.getElementById("gpx-input").addEventListener("change", onGpxChosen);
 document.getElementById("import-clear").addEventListener("click", clearImport);
 
-loadCollected()
-  .then(loadGeometry)
-  .then(loadPlanned);
-loadStatus().then((s) => {
-  if (s.connected) sync({ background: true }); // silent auto-sync on load
+renderStatus();
+loadGeometry();
+handleOAuthRedirect().then(() => {
+  if (token) sync({ background: true });
 });

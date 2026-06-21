@@ -7,14 +7,12 @@ import uvicorn
 from .app import create_app
 from .config import apply_dotenv, load_settings
 from .postcodes import load_pc4
-from .storage import Store
 
 
 def build_app():
     apply_dotenv()
     settings = load_settings()
     os.makedirs(settings.data_dir, exist_ok=True)
-    store = Store(settings.db_path)
 
     cache: dict = {}
     cache_lock = threading.Lock()
@@ -26,7 +24,7 @@ def build_app():
                 cache["idx"] = load_pc4(settings.pc4_path)
             return cache["idx"]
 
-    return create_app(settings, store, index_provider)
+    return create_app(settings, index_provider)
 
 
 def main() -> None:

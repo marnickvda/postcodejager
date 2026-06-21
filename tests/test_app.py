@@ -2,6 +2,7 @@ import json
 import pathlib
 
 import httpx
+import polyline
 import respx
 from fastapi.testclient import TestClient
 
@@ -9,10 +10,10 @@ from postcodejager.app import create_app
 from postcodejager.config import load_settings
 from postcodejager.gpx import build_gpx
 from postcodejager.postcodes import PC4Index
-from postcodejager.storage import Store
 
 FIX = pathlib.Path(__file__).parent / "fixtures" / "pc4_sample.geojson"
 
+# BRouter emits 3D coords: [lon, lat, elevation].
 BROUTER_GEOJSON = {
     "type": "FeatureCollection",
     "features": [
@@ -21,164 +22,137 @@ BROUTER_GEOJSON = {
             "properties": {"track-length": "3500"},
             "geometry": {
                 "type": "LineString",
-                "coordinates": [[4.905, 52.37], [4.935, 52.37]],
+                "coordinates": [[4.905, 52.37, 1.0], [4.935, 52.37, 2.0]],
             },
         }
     ],
 }
 
+STRAVA_RE = r"https://www\.strava\.com/.*"
 
-def make(tmp_path):
+
+def client():
     idx = PC4Index.from_geojson(json.loads(FIX.read_text()))
-    store = Store(str(tmp_path / "db.sqlite"))
     settings = load_settings({"BROUTER_BASE_URL": "https://brouter.test/brouter"})
-    app = create_app(settings, store, lambda: idx)
-    return TestClient(app), store
+    return TestClient(create_app(settings, lambda: idx))
 
 
-def test_status_initial(tmp_path):
-    c, _ = make(tmp_path)
-    r = c.get("/api/status")
-    assert r.status_code == 200
-    assert r.json()["connected"] is False
-    assert r.json()["collected_count"] == 0
-    assert r.json()["total_count"] == 2  # fixture has 2 PC4 areas
-
-
-def test_status_reports_total_and_collected(tmp_path):
-    c, store = make(tmp_path)
-    store.set_collected({"1011"})
-    body = c.get("/api/status").json()
-    assert body["collected_count"] == 1
-    assert body["total_count"] == 2
-
-
-def test_provinces_endpoint(tmp_path):
-    c, store = make(tmp_path)
-    store.set_collected({"1011"})
-    by = {p["name"]: p for p in c.get("/api/provinces").json()["provinces"]}
-    assert by["Noord-Holland"]["total"] == 1
-    assert by["Noord-Holland"]["collected"] == 1
-    assert by["Noord-Holland"]["percent"] == 100.0
-    assert by["Utrecht"]["collected"] == 0
-    assert by["Utrecht"]["percent"] == 0.0
-
-
-def test_selection_impact(tmp_path):
-    c, store = make(tmp_path)  # fixture: 1011 Noord-Holland, 1012 Utrecht (total 2)
-    store.set_collected({"1011"})  # currently 50%
-    store.set_planned({"1012"})  # selecting the other would reach 100%
-    body = c.get("/api/selection/impact").json()
-    assert body["new"] == 1
-    assert body["current_percent"] == 50.0
-    assert body["projected_percent"] == 100.0
-    assert body["increase"] == 50.0
-    provs = {p["name"]: p for p in body["provinces"]}
-    assert provs["Utrecht"]["new"] == 1
-    assert provs["Utrecht"]["increase"] == 100.0
-    assert "Noord-Holland" not in provs  # already collected, nothing new
-
-
-def test_geometry_endpoint_is_cacheable(tmp_path):
-    c, _ = make(tmp_path)
-    r = c.get("/api/pc4/geometry")
+# --- geometry ---------------------------------------------------------------
+def test_geometry_endpoint_is_cacheable():
+    r = client().get("/api/pc4/geometry")
     assert r.status_code == 200
     feats = r.json()["features"]
-    assert len(feats) == 2
     assert {f["properties"]["postcode"][:4] for f in feats} == {"1011", "1012"}
     assert "max-age" in r.headers.get("cache-control", "")
 
 
-def test_collected_endpoint(tmp_path):
-    c, store = make(tmp_path)
-    assert c.get("/api/collected").json()["collected"] == []
-    store.set_collected({"1011"})
-    assert c.get("/api/collected").json()["collected"] == ["1011"]
+# --- stateless compute over browser-supplied state --------------------------
+def test_provinces_from_collected():
+    by = {
+        p["name"]: p
+        for p in client().post("/api/provinces", json={"collected": ["1011"]}).json()[
+            "provinces"
+        ]
+    }
+    assert by["Noord-Holland"]["collected"] == 1
+    assert by["Noord-Holland"]["percent"] == 100.0
+    assert by["Utrecht"]["collected"] == 0
 
 
-def test_planned_toggle_get_clear(tmp_path):
-    c, _ = make(tmp_path)
-    assert c.get("/api/planned").json()["planned"] == []
-    assert c.post("/api/planned/toggle", json={"code": "1011"}).json()["planned"] == ["1011"]
-    c.post("/api/planned/toggle", json={"code": "1012"})
-    assert c.get("/api/planned").json()["planned"] == ["1011", "1012"]
-    c.post("/api/planned/toggle", json={"code": "1011"})  # toggle off
-    assert c.get("/api/planned").json()["planned"] == ["1012"]
-    c.post("/api/planned/clear")
-    assert c.get("/api/planned").json()["planned"] == []
+def test_selection_impact():
+    body = client().post(
+        "/api/selection/impact", json={"collected": ["1011"], "planned": ["1012"]}
+    ).json()
+    assert body["new"] == 1
+    assert body["current_percent"] == 50.0
+    assert body["projected_percent"] == 100.0
+    provs = {p["name"]: p for p in body["provinces"]}
+    assert provs["Utrecht"]["new"] == 1
+    assert "Noord-Holland" not in provs
 
 
-def test_planned_add_bulk(tmp_path):
-    c, _ = make(tmp_path)
-    c.post("/api/planned/toggle", json={"code": "1011"})
-    body = c.post("/api/planned/add", json={"codes": ["1012", "1011"]}).json()
-    assert body["planned"] == ["1011", "1012"]
-
-
-def test_route_auto_through_selected(tmp_path):
-    c, store = make(tmp_path)
-    store.set_planned({"1011", "1012"})
+def test_route_auto_through_selected():
     with respx.mock(assert_all_mocked=False) as router:
         router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
             return_value=httpx.Response(200, json=BROUTER_GEOJSON)
         )
-        r = c.post("/api/route/auto")
+        r = client().post(
+            "/api/route/auto",
+            json={"planned": ["1011", "1012"], "collected": ["1011"], "loop": True},
+        )
     assert r.status_code == 200
     body = r.json()
-    assert body["new_count"] == 2
-    assert sorted(body["new_codes"]) == ["1011", "1012"]
+    assert body["new_codes"] == ["1012"]  # 1011 already collected
     assert body["distance_m"] == 3500.0
 
 
-def test_route_auto_requires_at_least_two(tmp_path):
-    c, store = make(tmp_path)
-    store.set_planned({"1011"})
-    assert c.post("/api/route/auto").status_code == 400
+def test_route_auto_requires_at_least_two():
+    assert client().post("/api/route/auto", json={"planned": ["1011"]}).status_code == 400
 
 
-def test_route_auto_hides_raw_error(tmp_path):
-    c, store = make(tmp_path)
-    store.set_planned({"1011", "1012"})
+def test_route_auto_hides_raw_error():
     with respx.mock(assert_all_mocked=False) as router:
         router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
             return_value=httpx.Response(500, text="brouter-internal-boom")
         )
-        r = c.post("/api/route/auto")
+        r = client().post("/api/route/auto", json={"planned": ["1011", "1012"]})
     assert r.status_code == 502
-    detail = r.json()["detail"]
-    assert "brouter-internal-boom" not in detail
-    assert "Routeren mislukt" in detail
+    assert "brouter-internal-boom" not in r.json()["detail"]
 
 
-def test_import_gpx_counts_new_postcodes(tmp_path):
-    c, store = make(tmp_path)
-    gpx = build_gpx([(52.37, 4.905), (52.37, 4.935)], "Rit")  # crosses 1011 & 1012
-    body = c.post(
+def test_import_gpx_returns_crossed():
+    gpx = build_gpx([(52.37, 4.905), (52.37, 4.935)], "Rit")
+    body = client().post(
         "/api/import/gpx", content=gpx, headers={"Content-Type": "application/gpx+xml"}
     ).json()
-    assert body["new_count"] == 2
-    assert body["new_codes"] == ["1011", "1012"]
-
-    store.set_collected({"1011"})  # now only 1012 is new
-    body2 = c.post(
-        "/api/import/gpx", content=gpx, headers={"Content-Type": "application/gpx+xml"}
-    ).json()
-    assert body2["new_count"] == 1
-    assert body2["new_codes"] == ["1012"]
-    assert body2["already_count"] == 1
+    assert body["crossed"] == ["1011", "1012"]
+    assert body["geojson"]["geometry"]["type"] == "LineString"
 
 
-def test_import_gpx_rejects_garbage(tmp_path):
-    c, _ = make(tmp_path)
-    assert c.post("/api/import/gpx", content="not gpx").status_code == 400
+def test_import_gpx_rejects_garbage():
+    assert client().post("/api/import/gpx", content="not gpx").status_code == 400
 
 
-def test_export_track_returns_gpx(tmp_path):
-    c, _ = make(tmp_path)
-    r = c.post(
+def test_export_track_returns_gpx():
+    r = client().post(
         "/api/export/track",
         json={"points": [[52.37, 4.90], [52.38, 4.91]], "name": "Rit"},
     )
     assert r.status_code == 200
     assert "<gpx" in r.text
     assert "attachment" in r.headers.get("content-disposition", "")
+
+
+# --- Strava (mocked; secret stays server-side) ------------------------------
+def test_strava_exchange():
+    with respx.mock(assert_all_mocked=False) as router:
+        router.post("https://www.strava.com/oauth/token").mock(
+            return_value=httpx.Response(
+                200, json={"access_token": "AT", "refresh_token": "RT", "expires_at": 9}
+            )
+        )
+        r = client().post("/api/strava/exchange", json={"code": "xyz"})
+    assert r.json()["access_token"] == "AT"
+
+
+def test_sync_computes_collected():
+    poly = polyline.encode([(52.37, 4.905), (52.37, 4.935)])
+    page1 = [
+        {
+            "id": 1,
+            "name": "rit",
+            "start_date": "2026-06-20T08:00:00Z",
+            "map": {"summary_polyline": poly},
+        }
+    ]
+    with respx.mock(assert_all_mocked=False) as router:
+        router.get("https://www.strava.com/api/v3/athlete/activities").mock(
+            side_effect=[
+                httpx.Response(200, json=page1),
+                httpx.Response(200, json=[]),
+            ]
+        )
+        r = client().post("/api/sync", json={"access_token": "AT"})
+    body = r.json()
+    assert set(body["collected"]) == {"1011", "1012"}
+    assert body["activities"] == 1

@@ -1,5 +1,6 @@
 """Run the Postcodejager web app: python -m postcodejager."""
 import os
+import threading
 
 import uvicorn
 
@@ -16,11 +17,14 @@ def build_app():
     store = Store(settings.db_path)
 
     cache: dict = {}
+    cache_lock = threading.Lock()
 
     def index_provider():
-        if "idx" not in cache:
-            cache["idx"] = load_pc4(settings.pc4_path)
-        return cache["idx"]
+        # Build the ~4000-polygon index once even under a cold-start request burst.
+        with cache_lock:
+            if "idx" not in cache:
+                cache["idx"] = load_pc4(settings.pc4_path)
+            return cache["idx"]
 
     return create_app(settings, store, index_provider)
 

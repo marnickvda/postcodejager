@@ -1,3 +1,5 @@
+import threading
+
 from postcodejager.storage import Store
 
 
@@ -21,6 +23,32 @@ def test_last_sync(tmp_path):
     assert s.get_last_sync() is None
     s.set_last_sync(1700)
     assert s.get_last_sync() == 1700
+
+
+def test_concurrent_access_does_not_error(tmp_path):
+    # FastAPI runs sync endpoints in a threadpool; the auto-sync write races the
+    # read endpoints. The shared connection must be serialized or sqlite raises.
+    s = Store(str(tmp_path / "db.sqlite"))
+    errors: list[Exception] = []
+
+    def worker(i: int):
+        try:
+            for _ in range(40):
+                s.set_collected({str(1000 + i)})
+                s.get_collected()
+                s.toggle_planned(str(2000 + i))
+                s.get_planned()
+                s.mark_activity(i)
+                s.seen_activity_ids()
+        except Exception as exc:  # noqa: BLE001 - capture for assertion
+            errors.append(exc)
+
+    threads = [threading.Thread(target=worker, args=(i,)) for i in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    assert errors == []
 
 
 def test_planned_toggle_and_clear(tmp_path):

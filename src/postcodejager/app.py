@@ -1,5 +1,6 @@
 """FastAPI app wiring the core modules into a local web tool."""
 import pathlib
+import threading
 import time
 
 from fastapi import Body, FastAPI, HTTPException, Request
@@ -101,13 +102,17 @@ def create_app(
     # separately (small + dynamic) so reopening the page needs no geometry
     # download and a sync only refreshes the small list.
     geometry_cache: dict = {}
+    geometry_lock = threading.Lock()
 
     def geometry_fc() -> dict:
-        if "fc" not in geometry_cache:
-            geometry_cache["fc"] = index_provider().to_feature_collection(
-                set(), simplify_tolerance=DISPLAY_SIMPLIFY
-            )
-        return geometry_cache["fc"]
+        # Lock so a cold-start burst builds the simplified geometry once, not
+        # once per concurrent request.
+        with geometry_lock:
+            if "fc" not in geometry_cache:
+                geometry_cache["fc"] = index_provider().to_feature_collection(
+                    set(), simplify_tolerance=DISPLAY_SIMPLIFY
+                )
+            return geometry_cache["fc"]
 
     @app.get("/api/pc4/geometry")
     def pc4_geometry():

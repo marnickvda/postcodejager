@@ -4,7 +4,12 @@ import time
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, RedirectResponse, Response
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+)
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -90,12 +95,29 @@ def create_app(
         store.set_last_sync(int(time.time()))
         return {"added": len(fresh), "collected_count": len(store.get_collected())}
 
-    @app.get("/api/pc4")
-    def pc4():
-        collected = store.get_collected()
-        return index_provider().to_feature_collection(
-            collected, simplify_tolerance=DISPLAY_SIMPLIFY
+    # The simplified geometry is expensive to build and never changes, so
+    # compute it once and let the browser cache it. "Collected" state is served
+    # separately (small + dynamic) so reopening the page needs no geometry
+    # download and a sync only refreshes the small list.
+    geometry_cache: dict = {}
+
+    def geometry_fc() -> dict:
+        if "fc" not in geometry_cache:
+            geometry_cache["fc"] = index_provider().to_feature_collection(
+                set(), simplify_tolerance=DISPLAY_SIMPLIFY
+            )
+        return geometry_cache["fc"]
+
+    @app.get("/api/pc4/geometry")
+    def pc4_geometry():
+        return JSONResponse(
+            geometry_fc(),
+            headers={"Cache-Control": "public, max-age=86400"},
         )
+
+    @app.get("/api/collected")
+    def collected():
+        return {"collected": sorted(store.get_collected())}
 
     @app.post("/api/route")
     def plan_route(req: RouteRequest):

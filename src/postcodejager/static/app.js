@@ -2,13 +2,26 @@
 
 // --- map setup --------------------------------------------------------------
 const map = L.map("map").setView([52.1, 5.1], 8); // centered on the Netherlands
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution: "© OpenStreetMap-bijdragers",
-}).addTo(map);
+
+// CARTO basemaps: clean, free, no API key — a calm backdrop makes the colored
+// postcode overlay pop. Swap "voyager" for an alternative to change the look:
+//   voyager      — light, modern, with labels (default)
+//   positron     — very light grey, minimal (max overlay contrast)
+//   dark_matter  — dark theme
+// Browse more styles at https://leaflet-extras.github.io/leaflet-providers/preview/
+L.tileLayer(
+  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+  {
+    subdomains: "abcd",
+    maxZoom: 20,
+    attribution:
+      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, © <a href="https://carto.com/attributions">CARTO</a>',
+  }
+).addTo(map);
 
 let pc4Layer = null;
 let routeLayer = null;
+let collectedSet = new Set(); // PC4 codes already ridden (from Strava)
 const waypoints = []; // array of L.marker, in order
 
 // --- helpers ----------------------------------------------------------------
@@ -24,7 +37,7 @@ function clearMessage() {
 }
 
 function pc4Style(feature) {
-  const collected = feature.properties.collected;
+  const collected = collectedSet.has(feature.properties.postcode);
   return {
     color: collected ? "#2e7d32" : "#9aa0a6",
     weight: 1,
@@ -58,9 +71,8 @@ async function loadStatus() {
 // tooltips get left "stuck" when a mouseout is missed during zoom/pan/resize;
 // toggling display on our own element can never get stuck.
 function featureLabel(f) {
-  return `${f.properties.postcode} — ${
-    f.properties.collected ? "afgevinkt" : "open"
-  }`;
+  const collected = collectedSet.has(f.properties.postcode);
+  return `${f.properties.postcode} — ${collected ? "afgevinkt" : "open"}`;
 }
 
 const hint = document.createElement("div");
@@ -83,8 +95,10 @@ function hideHint() {
 map.on("zoomstart movestart", hideHint);
 map.getContainer().addEventListener("mouseleave", hideHint);
 
-async function loadPC4() {
-  const res = await fetch("/api/pc4");
+// Geometry is fetched once and browser-cached; collected state is small and
+// refreshed on its own, then applied by restyling the existing layer.
+async function loadGeometry() {
+  const res = await fetch("/api/pc4/geometry");
   const geo = await res.json();
   if (pc4Layer) map.removeLayer(pc4Layer);
   pc4Layer = L.geoJSON(geo, {
@@ -94,6 +108,13 @@ async function loadPC4() {
       layer.on("mouseout", hideHint);
     },
   }).addTo(map);
+}
+
+async function loadCollected() {
+  const res = await fetch("/api/collected");
+  const data = await res.json();
+  collectedSet = new Set(data.collected);
+  if (pc4Layer) pc4Layer.setStyle(pc4Style);
 }
 
 // --- waypoints --------------------------------------------------------------
@@ -153,7 +174,7 @@ async function sync() {
     const data = await res.json();
     showMessage(`${data.added} nieuwe ritten verwerkt.`);
     await loadStatus();
-    await loadPC4();
+    await loadCollected(); // geometry stays cached; just restyle
   } catch (err) {
     showMessage(`Sync mislukt: ${err.message}`, true);
   } finally {
@@ -231,4 +252,4 @@ document.getElementById("clear-btn").addEventListener("click", clearWaypoints);
 document.getElementById("export-btn").addEventListener("click", exportGpx);
 
 loadStatus();
-loadPC4();
+loadCollected().then(loadGeometry);

@@ -59,6 +59,12 @@ welcome.innerHTML =
   "</ol></div>";
 map.getContainer().appendChild(welcome);
 
+// --- map loading indicator (shown until the PC4 layer is rendered) ----------
+const mapLoading = document.createElement("div");
+mapLoading.className = "map-loading";
+mapLoading.innerHTML = '<span class="mini-spin"></span>Postcodes laden…';
+map.getContainer().appendChild(mapLoading);
+
 // --- helpers ----------------------------------------------------------------
 function showMessage(text, isError) {
   const el = document.getElementById("message");
@@ -149,6 +155,7 @@ map.getContainer().addEventListener("mouseleave", hideHint);
 // Geometry is fetched once and browser-cached; collected state is small and
 // refreshed on its own, then applied by restyling the existing layer.
 async function loadGeometry() {
+  mapLoading.classList.remove("hidden");
   const res = await fetch("/api/pc4/geometry");
   const geo = await res.json();
   if (pc4Layer) map.removeLayer(pc4Layer);
@@ -168,6 +175,7 @@ async function loadGeometry() {
       layer.on("click", () => toggleSelect(code, layer));
     },
   }).addTo(map);
+  mapLoading.classList.add("hidden");
 }
 
 async function loadCollected() {
@@ -532,6 +540,15 @@ async function onGpxChosen(e) {
   }
 }
 
+function clearImport() {
+  if (importedLayer) {
+    map.removeLayer(importedLayer);
+    importedLayer = null;
+  }
+  document.getElementById("import-result").classList.add("hidden");
+  clearMessage();
+}
+
 // --- wire up ----------------------------------------------------------------
 document.getElementById("refresh-btn").addEventListener("click", () => sync());
 document.getElementById("route-btn").addEventListener("click", computeRoute);
@@ -541,6 +558,7 @@ document
   .getElementById("import-btn")
   .addEventListener("click", () => document.getElementById("gpx-input").click());
 document.getElementById("gpx-input").addEventListener("change", onGpxChosen);
+document.getElementById("import-clear").addEventListener("click", clearImport);
 
 loadCollected()
   .then(loadGeometry)

@@ -121,6 +121,20 @@ def test_route_auto_requires_at_least_two(tmp_path):
     assert c.post("/api/route/auto").status_code == 400
 
 
+def test_route_auto_hides_raw_error(tmp_path):
+    c, store = make(tmp_path)
+    store.set_planned({"1011", "1012"})
+    with respx.mock(assert_all_mocked=False) as router:
+        router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
+            return_value=httpx.Response(500, text="brouter-internal-boom")
+        )
+        r = c.post("/api/route/auto")
+    assert r.status_code == 502
+    detail = r.json()["detail"]
+    assert "brouter-internal-boom" not in detail
+    assert "Routeren mislukt" in detail
+
+
 def test_import_gpx_counts_new_postcodes(tmp_path):
     c, store = make(tmp_path)
     gpx = build_gpx([(52.37, 4.905), (52.37, 4.935)], "Rit")  # crosses 1011 & 1012

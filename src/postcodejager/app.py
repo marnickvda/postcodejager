@@ -1,4 +1,5 @@
 """FastAPI app wiring the core modules into a local web tool."""
+import logging
 import pathlib
 import threading
 import time
@@ -21,6 +22,8 @@ from .config import Settings
 from .gpx import build_gpx, parse_gpx_points
 from .storage import Store
 from .strava import StravaClient, build_authorize_url
+
+logger = logging.getLogger("postcodejager")
 
 STATIC_DIR = pathlib.Path(__file__).parent / "static"
 # Degrees of geometry simplification for the display layer (~100 m). Keeps the
@@ -186,8 +189,15 @@ def create_app(
                 base_url=settings.brouter_base_url,
                 profile=settings.brouter_profile,
             )
-        except Exception as exc:  # surface routing failures to the UI
-            raise HTTPException(status_code=502, detail=f"Routeren mislukt: {exc}")
+        except Exception as exc:  # log the detail, show the user a clean message
+            logger.warning("route_auto failed: %r", exc)
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "Routeren mislukt. Liggen de postcodes te ver uit elkaar of is "
+                    "de routeserver even niet bereikbaar? Probeer het opnieuw."
+                ),
+            )
         new = routing_mod.new_postcodes(result.points, idx, store.get_collected())
         line = {
             "type": "Feature",

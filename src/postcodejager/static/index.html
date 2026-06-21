@@ -23,10 +23,13 @@
       <section class="card">
         <div class="row">
           <span class="label">Strava</span>
-          <span id="conn-status" class="pill pill-off">niet verbonden</span>
+          <span class="strava-status">
+            <span id="conn-status" class="pill pill-off">niet verbonden</span>
+            <button id="refresh-btn" class="icon-btn hidden" type="button"
+              title="Ritten verversen" aria-label="Ritten verversen">↻</button>
+          </span>
         </div>
         <a id="connect-btn" class="btn btn-strava" href="/auth/login">Verbind met Strava</a>
-        <button id="sync-btn" class="btn" type="button">Synchroniseer ritten</button>
       </section>
 
       <section class="card">

@@ -53,6 +53,9 @@ async function loadStatus() {
   const pill = document.getElementById("conn-status");
   pill.textContent = s.connected ? "verbonden" : "niet verbonden";
   pill.className = "pill " + (s.connected ? "pill-on" : "pill-off");
+  // When connected, hide the connect button and show the small refresh button.
+  document.getElementById("connect-btn").classList.toggle("hidden", s.connected);
+  document.getElementById("refresh-btn").classList.toggle("hidden", !s.connected);
   document.getElementById("collected-count").textContent = s.collected_count;
   document.getElementById("total-count").textContent = s.total_count;
   const pct = s.total_count ? (s.collected_count / s.total_count) * 100 : 0;
@@ -65,6 +68,7 @@ async function loadStatus() {
   document.getElementById("last-sync").textContent = s.last_sync
     ? new Date(s.last_sync * 1000).toLocaleDateString("nl-NL")
     : "nooit";
+  return s;
 }
 
 // Custom hover hint: a plain DOM element we fully control. Leaflet's own
@@ -163,23 +167,30 @@ function clearWaypoints() {
 map.on("click", (e) => addWaypoint(e.latlng));
 
 // --- actions ----------------------------------------------------------------
-async function sync() {
-  clearMessage();
-  const btn = document.getElementById("sync-btn");
+// background=true is used for the silent auto-sync on page load: it only
+// surfaces a message when something actually changed (or on error).
+async function sync({ background = false } = {}) {
+  if (!background) clearMessage();
+  const btn = document.getElementById("refresh-btn");
+  const pill = document.getElementById("conn-status");
+  btn.classList.add("spinning");
   btn.disabled = true;
-  btn.textContent = "Bezig met synchroniseren…";
+  pill.textContent = "synchroniseren…";
   try {
     const res = await fetch("/sync", { method: "POST" });
     if (!res.ok) throw new Error((await res.json()).detail || res.statusText);
     const data = await res.json();
-    showMessage(`${data.added} nieuwe ritten verwerkt.`);
-    await loadStatus();
+    await loadStatus(); // resets pill + counts
     await loadCollected(); // geometry stays cached; just restyle
+    if (!background || data.added > 0) {
+      showMessage(`${data.added} nieuwe ritten verwerkt.`);
+    }
   } catch (err) {
     showMessage(`Sync mislukt: ${err.message}`, true);
+    await loadStatus();
   } finally {
+    btn.classList.remove("spinning");
     btn.disabled = false;
-    btn.textContent = "Synchroniseer ritten";
   }
 }
 
@@ -246,10 +257,12 @@ async function exportGpx() {
 }
 
 // --- wire up ----------------------------------------------------------------
-document.getElementById("sync-btn").addEventListener("click", sync);
+document.getElementById("refresh-btn").addEventListener("click", () => sync());
 document.getElementById("route-btn").addEventListener("click", computeRoute);
 document.getElementById("clear-btn").addEventListener("click", clearWaypoints);
 document.getElementById("export-btn").addEventListener("click", exportGpx);
 
-loadStatus();
 loadCollected().then(loadGeometry);
+loadStatus().then((s) => {
+  if (s.connected) sync({ background: true }); // silent auto-sync on load
+});

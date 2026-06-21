@@ -79,6 +79,10 @@ body {
   font-size: 13px;
 }
 
+.tagline a {
+  color: var(--orange-dark);
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--line);
@@ -190,6 +194,13 @@ body {
 
 .btn-strava:hover {
   background: #e34402;
+}
+
+/* The welcome overlay sits inside the Leaflet container, whose
+   `.leaflet-container a` rule would otherwise tint this link-button blue. */
+#welcome .btn-strava,
+#welcome .btn-strava:visited {
+  color: #fff;
 }
 
 .btn-ghost {

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Postcodejager">
+  <path d="M32 3C18.7 3 8 13.4 8 26.3 8 44 32 61 32 61s24-17 24-34.7C56 13.4 45.3 3 32 3Z" fill="#ff6a13"/>
+  <g stroke="#fff" fill="none" stroke-linecap="round">
+    <circle cx="32" cy="27" r="11" stroke-width="3"/>
+    <line x1="43" y1="27" x2="21" y2="27" stroke-width="2.4"/>
+    <line x1="37.5" y1="36.53" x2="26.5" y2="17.47" stroke-width="2.4"/>
+    <line x1="26.5" y1="36.53" x2="37.5" y2="17.47" stroke-width="2.4"/>
+  </g>
+  <circle cx="32" cy="27" r="3" fill="#fff"/>
+</svg>

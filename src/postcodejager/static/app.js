@@ -333,6 +333,15 @@ async function loadPlanned() {
   refreshSelectionUI();
 }
 
+function clearRoute() {
+  if (routeLayer) {
+    map.removeLayer(routeLayer);
+    routeLayer = null;
+  }
+  lastRoutePoints = null;
+  document.getElementById("route-result").classList.add("hidden");
+}
+
 async function clearSelection() {
   if (!selectedSet.size) return;
   lastClearedSelection = [...selectedSet];
@@ -340,6 +349,7 @@ async function clearSelection() {
   Object.keys(selMarkers).forEach(removeSelMarker);
   selectedSet = new Set();
   if (pc4Layer) pc4Layer.setStyle(pc4Style);
+  clearRoute(); // the computed route belonged to the now-cleared selection
   refreshSelectionUI();
   showUndo(`${lastClearedSelection.length} postcodes gewist.`);
 }

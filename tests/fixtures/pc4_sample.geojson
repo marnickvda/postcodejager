@@ -1,0 +1,25 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "postcode": "1011" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [[4.90, 52.36], [4.92, 52.36], [4.92, 52.38], [4.90, 52.38], [4.90, 52.36]]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": { "postcode": "1012" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [[4.92, 52.36], [4.94, 52.36], [4.94, 52.38], [4.92, 52.38], [4.92, 52.36]]
+        ]
+      }
+    }
+  ]
+}

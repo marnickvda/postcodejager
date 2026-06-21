@@ -13,9 +13,8 @@ just compute + the public PC4 map data.
 
 | Item | Where |
 |---|---|
-| **Hetzner Cloud API token** (read/write) | console.hetzner.com → project → Security → API Tokens |
-| **Hetzner DNS API token** | dns.hetzner.com → API tokens |
-| **A domain/subdomain** in your Hetzner DNS zone | e.g. `postcodejager.jouwdomein.nl` |
+| **Hetzner Cloud API token** (read/write) | console.hetzner.com → project → Security → API Tokens. The same token manages DNS (provider v1.56+), so no separate DNS token is needed. |
+| **A domain/zone** that already exists in Hetzner DNS | e.g. `postcodejager.nl` (apex: `subdomain = "@"`) |
 | **An SSH keypair** | generated below |
 | **Strava API app** | strava.com/settings/api (you already have client id/secret) |
 | **A GitHub repo** with this code pushed | public repo = simplest (server clones over HTTPS) |

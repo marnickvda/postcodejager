@@ -4,12 +4,6 @@ variable "hcloud_token" {
   sensitive   = true
 }
 
-variable "hetznerdns_token" {
-  description = "Hetzner DNS API token (console.hetzner.com/dns -> API tokens)."
-  type        = string
-  sensitive   = true
-}
-
 variable "dns_zone" {
   description = "Your DNS zone in Hetzner DNS, e.g. example.com."
   type        = string

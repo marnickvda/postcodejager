@@ -3,21 +3,13 @@ terraform {
   required_providers {
     hcloud = {
       source  = "hetznercloud/hcloud"
-      version = "~> 1.48"
-    }
-    hetznerdns = {
-      source  = "timohirt/hetznerdns"
-      version = "~> 2.2"
+      version = "~> 1.56" # DNS resources (hcloud_zone_rrset) need >= 1.56
     }
   }
 }
 
 provider "hcloud" {
   token = var.hcloud_token
-}
-
-provider "hetznerdns" {
-  apitoken = var.hetznerdns_token
 }
 
 resource "hcloud_ssh_key" "deploy" {
@@ -66,15 +58,13 @@ resource "hcloud_server" "app" {
   }
 }
 
-# DNS A-record (subdomain -> server) in your existing Hetzner DNS zone.
-data "hetznerdns_zone" "zone" {
-  name = var.dns_zone
-}
-
-resource "hetznerdns_record" "app" {
-  zone_id = data.hetznerdns_zone.zone.id
+# DNS A-record in your existing Hetzner DNS zone, managed via the same Hetzner
+# Cloud token (DNS is part of the Cloud API since provider v1.56). The zone must
+# already exist in Hetzner DNS; "@" as name targets the apex.
+resource "hcloud_zone_rrset" "app" {
+  zone    = var.dns_zone
   name    = var.subdomain
   type    = "A"
-  value   = hcloud_server.app.ipv4_address
   ttl     = 300
+  records = [{ value = hcloud_server.app.ipv4_address }]
 }

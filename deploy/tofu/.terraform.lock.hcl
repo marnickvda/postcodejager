@@ -3,7 +3,7 @@
 
 provider "registry.opentofu.org/hetznercloud/hcloud" {
   version     = "1.66.0"
-  constraints = "~> 1.48"
+  constraints = "~> 1.56"
   hashes = [
     "h1:iVAGP8gRbZK0kJF7SiYJRt61wz0D5AF9q+WMsrAiBI0=",
     "zh:1286cee6fb63dbcb18f53077bbb5e5d132a4e4d9f006af4e8d8edfc08d6bcdc8",
@@ -19,21 +19,5 @@ provider "registry.opentofu.org/hetznercloud/hcloud" {
     "zh:ce3ed323d75ae905d975925fa98c7054a7514c81276a485fc37da8232b53e39f",
     "zh:d481bc0ef0c87ab1969c17777f526b2f59f823432d676145134c41a6d29bd98e",
     "zh:ea7ef88df2c3ca154d86238920636d52a3c9066c7467543d3fa45f1e52ec2f7b",
-  ]
-}
-
-provider "registry.opentofu.org/timohirt/hetznerdns" {
-  version     = "2.2.0"
-  constraints = "~> 2.2"
-  hashes = [
-    "h1:9a5BBgc0oi7DjmveI64xEhzW6wv5hQRAc+kmhs3QKyU=",
-    "zh:5bb0ab9f62be3ed92070235e507f3c290491d51391ef4edcc70df53b65a83019",
-    "zh:5ccdfac7284f5515ac3cff748336b77f21c64760e429e811a1eeefa8ebb86e12",
-    "zh:687c35665139ae37c291e99085be2e38071f6b355c4e1e8957c5a6a3bcdf9caf",
-    "zh:6de27f0d0d1513b3a4b7e81923b4a8506c52759bd466e2b4f8156997b0478931",
-    "zh:85770a9199a4c2d16ca41538d7a0f7a7bfc060678104a1faac19213e6f0a800c",
-    "zh:a5ff723774a9ccfb27d5766c5e6713537f74dd94496048c89c5d64dba597e59e",
-    "zh:bf9ab76fd37cb8aebb6868d73cbe8c08cee36fc25224cc1ef5949efa3c34b06c",
-    "zh:db998fe3bdcd4902e99fa470bb3f355883170cf4c711c8da0b5f1f4510f1be41",
   ]
 }

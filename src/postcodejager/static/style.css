@@ -317,7 +317,7 @@ body {
   height: 28px;
   border: 1px solid var(--line);
   background: #fff;
-  border-radius: 6px;
+  border-radius: 50%; /* round so the spin animation has no corners to swing */
   cursor: pointer;
   font-size: 15px;
   line-height: 1;

@@ -530,8 +530,6 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  max-height: 140px;
-  overflow-y: auto;
 }
 
 .chip {
@@ -560,6 +558,31 @@ kbd {
 
 .chip button:hover {
   color: #b71c1c;
+}
+
+.sel-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.sel-group-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.prov-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
 }
 
 .link-btn {

@@ -325,18 +325,52 @@ function refreshSelectionUI() {
     : "Bereken route";
   const list = document.getElementById("sel-list");
   list.innerHTML = "";
+
+  // group codes by province name
+  const byProv = new Map();
   for (const code of codes) {
-    const li = document.createElement("li");
-    li.className = "chip";
+    const prov = provinceOf(code);
+    if (!byProv.has(prov)) byProv.set(prov, []);
+    byProv.get(prov).push(code);
+  }
+  // province groups alphabetically, "Onbekend" last
+  const provNames = [...byProv.keys()].sort((a, b) => {
+    if (a === PROVINCE_UNKNOWN) return 1;
+    if (b === PROVINCE_UNKNOWN) return -1;
+    return a.localeCompare(b, "nl");
+  });
+
+  for (const prov of provNames) {
+    const group = document.createElement("div");
+    group.className = "sel-group";
+
+    const head = document.createElement("div");
+    head.className = "sel-group-head";
+    const dot = document.createElement("span");
+    dot.className = "prov-dot";
+    dot.style.background = provinceColor(prov);
     const label = document.createElement("span");
-    label.textContent = code;
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.setAttribute("aria-label", `Verwijder ${code}`);
-    btn.textContent = "×";
-    btn.addEventListener("click", () => deselectCode(code));
-    li.append(label, btn);
-    list.appendChild(li);
+    label.textContent = prov;
+    head.append(dot, label);
+
+    const ul = document.createElement("ul");
+    ul.className = "chips";
+    for (const code of byProv.get(prov)) {
+      const li = document.createElement("li");
+      li.className = "chip";
+      const codeLabel = document.createElement("span");
+      codeLabel.textContent = code;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.setAttribute("aria-label", `Verwijder ${code}`);
+      btn.textContent = "×";
+      btn.addEventListener("click", () => deselectCode(code));
+      li.append(codeLabel, btn);
+      ul.appendChild(li);
+    }
+
+    group.append(head, ul);
+    list.appendChild(group);
   }
   updateImpact();
 }

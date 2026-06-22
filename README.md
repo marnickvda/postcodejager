@@ -80,5 +80,7 @@ Standaard de publieke [BRouter](https://brouter.de)-server met het
 ## Databronnen & attributie
 
 - Postcodegrenzen: **CBS PC4** via PDOK/Opendatasoft — CC BY 4.0
+- Provinciegrenzen: **CBS provincies** via PDOK/Opendatasoft — CC BY 4.0
+  (meegeleverd in `src/postcodejager/data/provinces.geojson`)
 - Routing: **BRouter** op **OpenStreetMap**-data
 - Activiteiten: **Strava** (scope `activity:read_all`, alleen je eigen data)

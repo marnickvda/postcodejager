@@ -1,0 +1,20 @@
+name: "Idee / verzoek"
+description: "Een idee of functie die je graag zou willen zien."
+title: "[Idee]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Je idee
+      description: Wat zou je willen, en waarom?
+      placeholder: "Bijv. een knop om de route om te draaien."
+    validations:
+      required: true
+  - type: textarea
+    id: benefit
+    attributes:
+      label: Hoe zou dit je helpen?
+      description: Optioneel — wat zou er makkelijker of leuker van worden?
+    validations:
+      required: false

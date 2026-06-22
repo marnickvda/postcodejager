@@ -1,0 +1,24 @@
+name: "Vraag / hulp"
+description: "Een vraag over hoe iets werkt, of hulp nodig."
+title: "[Vraag]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Stel je vraag hieronder. Deel **geen** wachtwoorden of Strava-tokens.
+  - type: textarea
+    id: question
+    attributes:
+      label: Je vraag
+      description: Waar loop je tegenaan of wat wil je weten?
+      placeholder: "Bijv. hoe koppel ik mijn Strava-account opnieuw?"
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: Wat heb je al geprobeerd?
+      description: Optioneel — helpt ons sneller mee te denken.
+    validations:
+      required: false

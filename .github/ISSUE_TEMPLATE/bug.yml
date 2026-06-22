@@ -1,0 +1,65 @@
+name: "Bug / iets werkt niet"
+description: "Meld iets dat niet werkt zoals verwacht."
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Bedankt voor het melden! Deel hier **geen** wachtwoorden of Strava-tokens.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Wat ging er mis?
+      description: Wat gebeurde er, en wat had je verwacht?
+      placeholder: "Bijv. de route werd niet berekend; ik kreeg de melding ..."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Stappen om het te herhalen
+      description: Hoe kunnen we het zelf zien gebeuren?
+      placeholder: |
+        1. Selecteer ...
+        2. Klik op ...
+        3. Zie ...
+    validations:
+      required: false
+  - type: input
+    id: where
+    attributes:
+      label: Waar in de app?
+      placeholder: "Bijv. kaart, route, Strava-sync, GPX-export/-import"
+    validations:
+      required: false
+  - type: dropdown
+    id: device
+    attributes:
+      label: Apparaat
+      options:
+        - Desktop / laptop
+        - Telefoon
+        - Tablet
+        - Weet ik niet
+    validations:
+      required: false
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Safari
+        - Firefox
+        - Edge
+        - Anders / weet ik niet
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Schermafbeelding of extra info
+      description: Sleep hier eventueel een screenshot naartoe.
+    validations:
+      required: false

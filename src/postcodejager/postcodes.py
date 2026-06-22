@@ -130,7 +130,11 @@ class PC4Index:
             features.append(
                 {
                     "type": "Feature",
-                    "properties": {"postcode": code, "collected": code in collected},
+                    "properties": {
+                        "postcode": code,
+                        "collected": code in collected,
+                        "prov": self._provinces.get(code),
+                    },
                     "geometry": mapping(geom),
                 }
             )

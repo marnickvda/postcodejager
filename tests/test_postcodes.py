@@ -103,3 +103,34 @@ def test_provinces():
         "Noord-Holland": {"1011"},
         "Utrecht": {"1012"},
     }
+
+
+def test_to_feature_collection_includes_province():
+    idx = load()
+    props = {
+        f["properties"]["postcode"]: f["properties"]
+        for f in idx.to_feature_collection(set())["features"]
+    }
+    assert props["1011"]["prov"] == "Noord-Holland"
+    assert props["1012"]["prov"] == "Utrecht"
+
+
+def test_to_feature_collection_prov_is_none_when_missing():
+    idx = PC4Index.from_geojson(
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"postcode": "0000"},  # no prov_name
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [[4.90, 52.30], [4.91, 52.30], [4.91, 52.31], [4.90, 52.31], [4.90, 52.30]]
+                        ],
+                    },
+                }
+            ],
+        }
+    )
+    assert idx.to_feature_collection(set())["features"][0]["properties"]["prov"] is None

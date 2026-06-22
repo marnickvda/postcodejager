@@ -114,16 +114,19 @@ class PC4Index:
         """Dissolved province outlines: one Feature per province with areas.
 
         Unions each province's PC4 polygons into a single shape (the 41
-        province-less areas belong to no province and are omitted). Each
-        Feature carries ``properties.name``. ``simplify_tolerance`` (degrees)
-        thins geometry for a lighter payload.
+        province-less areas belong to no province and are omitted). Real PC4
+        polygons don't share exact edges, so a plain union leaves a mesh of
+        internal slivers; a small buffer out-then-in "closes" those gaps into a
+        clean outline. Each Feature carries ``properties.name``;
+        ``simplify_tolerance`` (degrees) thins geometry for a lighter payload.
         """
+        close = 0.001  # ~70-110 m: merges inter-area slivers without reshaping
         groups: dict[str, list] = {}
         for code, prov in self._provinces.items():
             groups.setdefault(prov, []).append(self._polys[code])
         features = []
         for name in sorted(groups):
-            geom = unary_union(groups[name])
+            geom = unary_union(groups[name]).buffer(close).buffer(-close)
             if simplify_tolerance:
                 geom = geom.simplify(simplify_tolerance, preserve_topology=True)
             features.append(

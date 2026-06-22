@@ -150,6 +150,14 @@ def create_app(
     def index():
         return FileResponse(str(STATIC_DIR / "index.html"))
 
+    @app.get("/privacy")
+    def privacy():
+        return FileResponse(str(STATIC_DIR / "privacy.html"))
+
+    @app.get("/voorwaarden")
+    def voorwaarden():
+        return FileResponse(str(STATIC_DIR / "voorwaarden.html"))
+
     @app.get("/auth/login")
     def login():
         url = build_authorize_url(settings.strava_client_id, settings.strava_redirect_uri)

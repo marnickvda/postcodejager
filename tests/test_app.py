@@ -37,6 +37,19 @@ def client():
     return TestClient(create_app(settings, lambda: idx))
 
 
+# --- pages ------------------------------------------------------------------
+def test_privacy_page_at_clean_path():
+    r = client().get("/privacy")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+
+
+def test_voorwaarden_page_at_clean_path():
+    r = client().get("/voorwaarden")
+    assert r.status_code == 200
+    assert "text/html" in r.headers["content-type"]
+
+
 # --- geometry ---------------------------------------------------------------
 def test_geometry_endpoint_is_cacheable():
     r = client().get("/api/pc4/geometry")

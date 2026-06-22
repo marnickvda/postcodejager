@@ -46,6 +46,14 @@ def test_geometry_endpoint_is_cacheable():
     assert "max-age" in r.headers.get("cache-control", "")
 
 
+def test_provinces_geometry_endpoint():
+    r = client().get("/api/provinces/geometry")
+    assert r.status_code == 200
+    names = {f["properties"]["name"] for f in r.json()["features"]}
+    assert names == {"Noord-Holland", "Utrecht"}
+    assert "max-age" in r.headers.get("cache-control", "")
+
+
 # --- stateless compute over browser-supplied state --------------------------
 def test_provinces_from_collected():
     by = {

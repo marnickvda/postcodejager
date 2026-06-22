@@ -119,6 +119,17 @@ def create_app(
                 )
             return geometry_cache["fc"]
 
+    provinces_geometry_cache: dict = {}
+    provinces_geometry_lock = threading.Lock()
+
+    def provinces_geometry_fc() -> dict:
+        with provinces_geometry_lock:
+            if "fc" not in provinces_geometry_cache:
+                provinces_geometry_cache["fc"] = index_provider().province_boundaries_fc(
+                    simplify_tolerance=DISPLAY_SIMPLIFY
+                )
+            return provinces_geometry_cache["fc"]
+
     def _line(points) -> dict:
         return {
             "type": "Feature",
@@ -183,6 +194,13 @@ def create_app(
     def pc4_geometry():
         return JSONResponse(
             geometry_fc(), headers={"Cache-Control": "public, max-age=86400"}
+        )
+
+    @app.get("/api/provinces/geometry")
+    def provinces_geometry_endpoint():
+        return JSONResponse(
+            provinces_geometry_fc(),
+            headers={"Cache-Control": "public, max-age=86400"},
         )
 
     # --- stateless compute over browser-supplied state --------------------

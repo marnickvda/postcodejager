@@ -134,3 +134,43 @@ def test_to_feature_collection_prov_is_none_when_missing():
         }
     )
     assert idx.to_feature_collection(set())["features"][0]["properties"]["prov"] is None
+
+
+def test_province_boundaries_one_feature_per_province():
+    fc = load().province_boundaries_fc()
+    names = sorted(f["properties"]["name"] for f in fc["features"])
+    assert names == ["Noord-Holland", "Utrecht"]
+    for f in fc["features"]:
+        assert f["geometry"]["type"] in ("Polygon", "MultiPolygon")
+
+
+def test_province_boundaries_excludes_provinceless():
+    idx = PC4Index.from_geojson(
+        {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"postcode": "1011", "prov_name": "Noord-Holland"},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [[4.90, 52.36], [4.92, 52.36], [4.92, 52.38], [4.90, 52.38], [4.90, 52.36]]
+                        ],
+                    },
+                },
+                {
+                    "type": "Feature",
+                    "properties": {"postcode": "0000"},  # no prov_name
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [[4.80, 52.30], [4.81, 52.30], [4.81, 52.31], [4.80, 52.31], [4.80, 52.30]]
+                        ],
+                    },
+                },
+            ],
+        }
+    )
+    fc = idx.province_boundaries_fc()
+    assert [f["properties"]["name"] for f in fc["features"]] == ["Noord-Holland"]

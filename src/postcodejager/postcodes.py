@@ -7,7 +7,7 @@ import json
 import math
 
 from shapely.geometry import Point, mapping, shape
-from shapely.ops import nearest_points
+from shapely.ops import nearest_points, unary_union
 from shapely.strtree import STRtree
 
 # Property keys that may hold the 4-digit code across data sources.
@@ -107,6 +107,33 @@ class PC4Index:
             return self.centroid(code)  # degenerate sliver: best-effort interior
         p = nearest_points(inner, tp)[0]  # deepest-enough point nearest the corridor
         return (p.y, p.x)
+
+    def province_boundaries_fc(
+        self, simplify_tolerance: float | None = None
+    ) -> dict:
+        """Dissolved province outlines: one Feature per province with areas.
+
+        Unions each province's PC4 polygons into a single shape (the 41
+        province-less areas belong to no province and are omitted). Each
+        Feature carries ``properties.name``. ``simplify_tolerance`` (degrees)
+        thins geometry for a lighter payload.
+        """
+        groups: dict[str, list] = {}
+        for code, prov in self._provinces.items():
+            groups.setdefault(prov, []).append(self._polys[code])
+        features = []
+        for name in sorted(groups):
+            geom = unary_union(groups[name])
+            if simplify_tolerance:
+                geom = geom.simplify(simplify_tolerance, preserve_topology=True)
+            features.append(
+                {
+                    "type": "Feature",
+                    "properties": {"name": name},
+                    "geometry": mapping(geom),
+                }
+            )
+        return {"type": "FeatureCollection", "features": features}
 
     def codes_by_province(self) -> dict[str, set[str]]:
         out: dict[str, set[str]] = {}

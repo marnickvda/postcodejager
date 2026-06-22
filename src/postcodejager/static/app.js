@@ -259,7 +259,12 @@ async function loadProvinces() {
     head.className = "prov-head";
     const name = document.createElement("span");
     name.className = "prov-name";
-    name.textContent = p.name;
+    const dot = document.createElement("span");
+    dot.className = "prov-dot";
+    dot.style.background = provinceColor(p.name);
+    const nameText = document.createElement("span");
+    nameText.textContent = p.name;
+    name.append(dot, nameText);
     const meta = document.createElement("span");
     meta.className = "prov-meta";
     meta.textContent = `${fmtPct(p.percent)}% · ${p.collected}/${p.total}`;

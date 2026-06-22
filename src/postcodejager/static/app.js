@@ -72,6 +72,11 @@ const selMarkers = {}; // code -> checkmark marker
 let lastRoutePoints = null;
 let lastClearedSelection = null;
 
+// Cache-buster for the day-cached geometry endpoints. Bump when the shape of
+// the served features changes (e.g. a new property) so clients refetch instead
+// of serving a stale copy. v2 added each area's `prov` (province) field.
+const DATA_VERSION = "2";
+
 // === Provinces ===============================================================
 const PROVINCE_COLORS = {
   Drenthe: "#9A6324",
@@ -215,7 +220,7 @@ map.getContainer().addEventListener("mouseleave", hideHint);
 // === Geometry + collected/province rendering =================================
 async function loadGeometry() {
   mapLoading.classList.remove("hidden");
-  const geo = await (await fetch("/api/pc4/geometry")).json();
+  const geo = await (await fetch("/api/pc4/geometry?v=" + DATA_VERSION)).json();
   totalPc4 = geo.features.length;
   if (pc4Layer) map.removeLayer(pc4Layer);
   pc4Layer = L.geoJSON(geo, {
@@ -281,7 +286,7 @@ async function loadProvinces() {
 }
 
 async function loadProvinceBoundaries() {
-  const geo = await (await fetch("/api/provinces/geometry")).json();
+  const geo = await (await fetch("/api/provinces/geometry?v=" + DATA_VERSION)).json();
   if (provinceLayer) map.removeLayer(provinceLayer);
   provinceLayer = L.geoJSON(geo, {
     interactive: false, // clicks pass through to the postcode areas beneath

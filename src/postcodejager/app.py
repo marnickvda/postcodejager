@@ -26,11 +26,14 @@ from . import planning as planning_mod
 from . import routing as routing_mod
 from .config import Settings
 from .gpx import build_gpx, parse_gpx_points
+from .postcodes import load_province_fc
 from .strava import StravaClient, build_authorize_url
 
 logger = logging.getLogger("postcodejager")
 
 STATIC_DIR = pathlib.Path(__file__).parent / "static"
+# Official CBS province boundaries (CC BY 4.0), bundled with the package.
+PROVINCE_GEOJSON = pathlib.Path(__file__).parent / "data" / "provinces.geojson"
 # Degrees of geometry simplification for the display layer (~100 m).
 DISPLAY_SIMPLIFY = 0.001
 
@@ -125,8 +128,8 @@ def create_app(
     def provinces_geometry_fc() -> dict:
         with provinces_geometry_lock:
             if "fc" not in provinces_geometry_cache:
-                provinces_geometry_cache["fc"] = index_provider().province_boundaries_fc(
-                    simplify_tolerance=DISPLAY_SIMPLIFY
+                provinces_geometry_cache["fc"] = load_province_fc(
+                    str(PROVINCE_GEOJSON), simplify_tolerance=DISPLAY_SIMPLIFY
                 )
             return provinces_geometry_cache["fc"]
 

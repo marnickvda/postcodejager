@@ -47,10 +47,14 @@ def test_geometry_endpoint_is_cacheable():
 
 
 def test_provinces_geometry_endpoint():
+    # Serves the bundled official CBS province boundaries (all 12 provinces).
     r = client().get("/api/provinces/geometry")
     assert r.status_code == 200
-    names = {f["properties"]["name"] for f in r.json()["features"]}
-    assert names == {"Noord-Holland", "Utrecht"}
+    body = r.json()
+    assert body["type"] == "FeatureCollection"
+    names = {f["properties"]["name"] for f in body["features"]}
+    assert len(names) == 12
+    assert {"Noord-Holland", "Utrecht", "Fryslân"} <= names  # incl. accented name
     assert "max-age" in r.headers.get("cache-control", "")
 
 

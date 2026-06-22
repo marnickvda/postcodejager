@@ -7,7 +7,7 @@ import json
 import math
 
 from shapely.geometry import Point, mapping, shape
-from shapely.ops import nearest_points, unary_union
+from shapely.ops import nearest_points
 from shapely.strtree import STRtree
 
 # Property keys that may hold the 4-digit code across data sources.
@@ -108,36 +108,6 @@ class PC4Index:
         p = nearest_points(inner, tp)[0]  # deepest-enough point nearest the corridor
         return (p.y, p.x)
 
-    def province_boundaries_fc(
-        self, simplify_tolerance: float | None = None
-    ) -> dict:
-        """Dissolved province outlines: one Feature per province with areas.
-
-        Unions each province's PC4 polygons into a single shape (the 41
-        province-less areas belong to no province and are omitted). Real PC4
-        polygons don't share exact edges, so a plain union leaves a mesh of
-        internal slivers; a small buffer out-then-in "closes" those gaps into a
-        clean outline. Each Feature carries ``properties.name``;
-        ``simplify_tolerance`` (degrees) thins geometry for a lighter payload.
-        """
-        close = 0.001  # ~70-110 m: merges inter-area slivers without reshaping
-        groups: dict[str, list] = {}
-        for code, prov in self._provinces.items():
-            groups.setdefault(prov, []).append(self._polys[code])
-        features = []
-        for name in sorted(groups):
-            geom = unary_union(groups[name]).buffer(close).buffer(-close)
-            if simplify_tolerance:
-                geom = geom.simplify(simplify_tolerance, preserve_topology=True)
-            features.append(
-                {
-                    "type": "Feature",
-                    "properties": {"name": name},
-                    "geometry": mapping(geom),
-                }
-            )
-        return {"type": "FeatureCollection", "features": features}
-
     def codes_by_province(self) -> dict[str, set[str]]:
         out: dict[str, set[str]] = {}
         for code, prov in self._provinces.items():
@@ -186,3 +156,34 @@ def download_pc4_geojson(dest: str, url: str, http=None) -> str:
 def load_pc4(path: str) -> PC4Index:
     with open(path) as f:
         return PC4Index.from_geojson(json.load(f))
+
+
+def province_fc(raw: dict, simplify_tolerance: float | None = None) -> dict:
+    """Display FeatureCollection from the official CBS provincie GeoJSON.
+
+    Keeps one Feature per province with ``properties = {"name": <prov_name>}``
+    (the source stores ``prov_name`` as a single-element list and carries extra
+    fields) and an optionally simplified geometry. ``simplify_tolerance``
+    (degrees) thins geometry for a lighter payload.
+    """
+    features = []
+    for feat in raw["features"]:
+        pn = feat.get("properties", {}).get("prov_name")
+        name = pn[0] if isinstance(pn, list) else pn
+        geom = shape(feat["geometry"])
+        if simplify_tolerance:
+            geom = geom.simplify(simplify_tolerance, preserve_topology=True)
+        features.append(
+            {
+                "type": "Feature",
+                "properties": {"name": name},
+                "geometry": mapping(geom),
+            }
+        )
+    return {"type": "FeatureCollection", "features": features}
+
+
+def load_province_fc(path: str, simplify_tolerance: float | None = None) -> dict:
+    """Load and transform the bundled CBS provincie GeoJSON for display."""
+    with open(path) as f:
+        return province_fc(json.load(f), simplify_tolerance)

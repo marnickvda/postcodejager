@@ -2,7 +2,7 @@ import json
 import pathlib
 
 from postcodejager.geo import haversine_m
-from postcodejager.postcodes import PC4Index
+from postcodejager.postcodes import PC4Index, province_fc
 
 FIX = pathlib.Path(__file__).parent / "fixtures" / "pc4_sample.geojson"
 
@@ -136,41 +136,49 @@ def test_to_feature_collection_prov_is_none_when_missing():
     assert idx.to_feature_collection(set())["features"][0]["properties"]["prov"] is None
 
 
-def test_province_boundaries_one_feature_per_province():
-    fc = load().province_boundaries_fc()
-    names = sorted(f["properties"]["name"] for f in fc["features"])
-    assert names == ["Noord-Holland", "Utrecht"]
-    for f in fc["features"]:
-        assert f["geometry"]["type"] in ("Polygon", "MultiPolygon")
-
-
-def test_province_boundaries_excludes_provinceless():
-    idx = PC4Index.from_geojson(
+# Official CBS provincie GeoJSON stores prov_name as a single-element list and
+# carries extra properties; province_fc unwraps the name and trims the rest.
+RAW_PROVINCE = {
+    "type": "FeatureCollection",
+    "features": [
         {
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "properties": {"postcode": "1011", "prov_name": "Noord-Holland"},
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [
-                            [[4.90, 52.36], [4.92, 52.36], [4.92, 52.38], [4.90, 52.38], [4.90, 52.36]]
-                        ],
-                    },
-                },
-                {
-                    "type": "Feature",
-                    "properties": {"postcode": "0000"},  # no prov_name
-                    "geometry": {
-                        "type": "Polygon",
-                        "coordinates": [
-                            [[4.80, 52.30], [4.81, 52.30], [4.81, 52.31], [4.80, 52.31], [4.80, 52.30]]
-                        ],
-                    },
-                },
-            ],
+            "type": "Feature",
+            "properties": {
+                "prov_name": ["Drenthe"],
+                "prov_code": "22",
+                "geo_point_2d": [6.05, 52.85],
+            },
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [[6.0, 52.8], [6.1, 52.8], [6.1, 52.9], [6.0, 52.9], [6.0, 52.8]]
+                ],
+            },
         }
-    )
-    fc = idx.province_boundaries_fc()
-    assert [f["properties"]["name"] for f in fc["features"]] == ["Noord-Holland"]
+    ],
+}
+
+
+def test_province_fc_unwraps_name_and_trims_properties():
+    f = province_fc(RAW_PROVINCE)["features"][0]
+    assert f["properties"] == {"name": "Drenthe"}  # only name; extras dropped
+    assert f["geometry"]["type"] == "Polygon"
+
+
+def test_province_fc_accepts_plain_string_name():
+    raw = {
+        "type": "FeatureCollection",
+        "features": [
+            {
+                "type": "Feature",
+                "properties": {"prov_name": "Utrecht"},
+                "geometry": {
+                    "type": "Polygon",
+                    "coordinates": [
+                        [[5.0, 52.0], [5.1, 52.0], [5.1, 52.1], [5.0, 52.1], [5.0, 52.0]]
+                    ],
+                },
+            }
+        ],
+    }
+    assert province_fc(raw)["features"][0]["properties"]["name"] == "Utrecht"

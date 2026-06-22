@@ -16,6 +16,21 @@ def test_gpx_is_valid_xml_with_points():
     assert root.find(".//g:trk/g:name", ns).text == "Testrit"
 
 
+def test_gpx_tags_track_type_when_given():
+    xml = build_gpx([(52.37, 4.90), (52.38, 4.91)], "Rit", track_type="cycling")
+    root = ET.fromstring(xml)
+    ns = {"g": "http://www.topografix.com/GPX/1/1"}
+    assert root.find(".//g:trk/g:type", ns).text == "cycling"
+
+
+def test_gpx_omits_track_type_by_default():
+    # Neutral by default: no <type>, so the file stays portable for sideload.
+    xml = build_gpx([(52.37, 4.90), (52.38, 4.91)], "Rit")
+    root = ET.fromstring(xml)
+    ns = {"g": "http://www.topografix.com/GPX/1/1"}
+    assert root.find(".//g:trk/g:type", ns) is None
+
+
 def test_parse_gpx_points_roundtrip():
     xml = build_gpx([(52.37, 4.90), (52.38, 4.91)], "Rit")
     assert parse_gpx_points(xml) == [(52.37, 4.90), (52.38, 4.91)]

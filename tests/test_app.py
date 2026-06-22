@@ -98,6 +98,23 @@ def test_route_auto_through_selected():
     assert body["distance_m"] == 3500.0
 
 
+def test_route_auto_anchors_route_at_start():
+    with respx.mock(assert_all_mocked=False) as router:
+        rt = router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
+            return_value=httpx.Response(200, json=BROUTER_GEOJSON)
+        )
+        r = client().post(
+            "/api/route/auto",
+            json={"planned": ["1011", "1012"], "loop": True, "start": [52.30, 4.80]},
+        )
+    assert r.status_code == 200
+    # BRouter is called with lon,lat pairs; the start coord must be in there.
+    from urllib.parse import unquote
+
+    sent = unquote(str(rt.calls.last.request.url))
+    assert "4.8,52.3" in sent  # start waypoint (lon,lat) reached the router
+
+
 def test_route_auto_requires_at_least_two():
     assert client().post("/api/route/auto", json={"planned": ["1011"]}).status_code == 400
 

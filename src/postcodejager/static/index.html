@@ -99,6 +99,28 @@
           <input id="loop-toggle" type="checkbox" checked />
           Rondrit (terug naar start)
         </label>
+        <div class="endpoints" aria-label="Start- en eindpunt">
+          <div class="row endpoint">
+            <span class="label">Start</span>
+            <span id="start-coord" class="muted">niet gezet</span>
+            <span class="endpoint-actions">
+              <button id="set-start-btn" class="btn btn-ghost btn-sm" type="button" aria-pressed="false">Op kaart</button>
+              <button id="clear-start-btn" class="btn btn-ghost btn-sm icon-btn hidden" type="button" aria-label="Startpunt wissen" title="Wissen">×</button>
+            </span>
+          </div>
+          <div class="row endpoint" id="end-row">
+            <span class="label">Eind</span>
+            <span id="end-coord" class="muted">niet gezet</span>
+            <span class="endpoint-actions">
+              <button id="set-end-btn" class="btn btn-ghost btn-sm" type="button" aria-pressed="false">Op kaart</button>
+              <button id="clear-end-btn" class="btn btn-ghost btn-sm icon-btn hidden" type="button" aria-label="Eindpunt wissen" title="Wissen">×</button>
+            </span>
+          </div>
+          <p class="hint">
+            Kies "Op kaart" en klik een punt. Zonder start begint de route bij het
+            eerste gebied; het eindpunt geldt alleen voor een punt-naar-punt-rit.
+          </p>
+        </div>
         <button id="route-btn" class="btn btn-primary" type="button">Bereken route</button>
         <button id="clear-btn" class="btn btn-ghost" type="button">Wis selectie</button>
         <div id="route-result" class="result hidden">

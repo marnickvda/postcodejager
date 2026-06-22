@@ -34,6 +34,7 @@ class Settings:
     strava_redirect_uri: str
     brouter_base_url: str
     brouter_profile: str
+    gpx_track_type: str
     data_dir: str
     pc4_path: str
     db_path: str
@@ -54,6 +55,8 @@ def load_settings(env: dict | None = None) -> Settings:
         ),
         brouter_base_url=e.get("BROUTER_BASE_URL", "https://brouter.de/brouter"),
         brouter_profile=e.get("BROUTER_PROFILE", "trekking"),
+        # Discipline hint written to the GPX <type>; blank keeps it neutral.
+        gpx_track_type=e.get("GPX_TRACK_TYPE", "cycling"),
         data_dir=data_dir,
         pc4_path=e.get("PC4_PATH", os.path.join(data_dir, "pc4.geojson")),
         db_path=e.get("DB_PATH", os.path.join(data_dir, "postcodejager.sqlite")),

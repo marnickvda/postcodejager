@@ -22,6 +22,8 @@ dus er is geen database en geen login nodig.
   provincie).
 - **Route**: de tool ordent de selectie (nearest-neighbour + 2-opt) en routeert er
   via BRouter doorheen over verharde wegen/fietspaden, als rondrit of punt-naar-punt.
+  Optioneel klik je een **startpunt** op de kaart (en bij punt-naar-punt ook een
+  **eindpunt**); de rondrit vertrekt en eindigt dan thuis.
 - **GPX**: exporteer de route, of **importeer** een GPX om meteen te zien hoeveel
   nieuwe postcodes hij pakt.
 
@@ -59,6 +61,13 @@ De GPX is neutraal en werkt voor beide routes:
 - **Direct (gratis)**: zet het GPX-bestand rechtstreeks op je Garmin/Wahoo
   (USB of via Garmin Connect / de Wahoo-app).
 
+De track krijgt standaard een `<type>cycling</type>`-hint, zodat import-apps
+(Strava/Komoot) de rit meteen als fietsroute herkennen. Pas dit aan met
+`GPX_TRACK_TYPE` in `.env` (bijv. `Road cycling`), of zet hem leeg
+(`GPX_TRACK_TYPE=`) voor een volledig neutrale GPX. Let op: de meeste
+fietscomputers negeren deze hint en vragen het profiel bij de start van de rit —
+voor een sport die je Garmin écht overneemt is een FIT/TCX-koers nodig.
+
 ## Tests
 
 ```bash
@@ -76,6 +85,22 @@ Omdat de backend stateless is, is er geen database om te bewaren.
 Standaard de publieke [BRouter](https://brouter.de)-server met het
 `trekking`-profiel. Zelf hosten of een ander profiel kan via `BROUTER_BASE_URL` /
 `BROUTER_PROFILE` in `.env`.
+
+## Route afstellen
+
+De route wordt *door* elk gebied geregen — een ingang aan de kant van het vorige
+gebied en een uitgang aan de kant van het volgende — zodat de rit doorloopt in
+plaats van er telkens in te duiken en terug te keren. Twee constanten in de code
+sturen dat gedrag:
+
+- **`ENTRY_DEPTH_M`** (`src/postcodejager/postcodes.py`, standaard `250`) — hoe
+  diep (in meters) een waypoint het gebied in ligt. Hoger = robuuster afvinken
+  (minder kans dat BRouter een waypoint net buiten de grens snapt), maar minder
+  vloeiend. Lager = strakkere lijn, iets gevoeliger voor GPS-ruis.
+- **`COLLAPSE_M`** (`src/postcodejager/planning.py`, standaard `40`) — liggen de
+  in- en uitgang dichter dan dit bij elkaar, dan worden ze één punt. Voorkomt een
+  nutteloze mini-omweg in gebieden die te klein of te ingeklemd zijn om
+  doorheen te rijden.
 
 ## Databronnen & attributie
 

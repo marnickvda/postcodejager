@@ -79,14 +79,26 @@ def test_entry_point_target_inside_unchanged():
     assert idx.entry_point("1011", inside) == inside
 
 
-def test_entry_point_dips_at_least_1km_into_typical_area():
-    # ~2.7 km wide (E-W) — a realistic PC4 size that still fits a 1 km-deep point.
+def test_entry_point_default_depth_is_a_few_hundred_metres():
+    # ~2.7 km wide (E-W). The default entry dips a few hundred metres in —
+    # enough to register robustly, shallow enough to keep the route flowing
+    # (not the old ~1 km deep-dive that caused out-and-back spurs).
     idx = _square_index("9999", 51.98, 5.00, 0.04)
     ep = idx.entry_point("9999", (52.0, 4.0))  # corridor far to the west
     assert idx.code_for_point(ep) == "9999"  # inside the area
     west_edge = (ep[0], 5.00)  # nearest boundary is the west edge
-    assert haversine_m(ep, west_edge) >= 950.0  # at least ~1 km in
-    assert ep[1] < 5.02  # but stays on the corridor side, not a deep detour
+    depth = haversine_m(ep, west_edge)
+    assert 150.0 <= depth <= 450.0  # ~250 m, not a deep detour
+
+
+def test_entry_point_depth_m_override_controls_dip():
+    # A deeper requested depth lands the point further from the near edge.
+    idx = _square_index("9999", 51.98, 5.00, 0.04)
+    shallow = idx.entry_point("9999", (52.0, 4.0), depth_m=100.0)
+    deep = idx.entry_point("9999", (52.0, 4.0), depth_m=800.0)
+    shallow_depth = haversine_m(shallow, (shallow[0], 5.00))
+    deep_depth = haversine_m(deep, (deep[0], 5.00))
+    assert shallow_depth < deep_depth
 
 
 def test_entry_point_small_area_goes_as_deep_as_possible():

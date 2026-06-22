@@ -55,6 +55,8 @@ class RouteRequest(BaseModel):
     planned: list[str]
     collected: list[str] = []
     loop: bool = True
+    start: tuple[float, float] | None = None  # (lat, lon) the route begins/ends at
+    end: tuple[float, float] | None = None  # (lat, lon) finish for a point-to-point
 
 
 class CollectedRequest(BaseModel):
@@ -262,23 +264,20 @@ def create_app(
                 status_code=400,
                 detail="Selecteer minstens 2 postcodes voor een route",
             )
+        start = tuple(req.start) if req.start else None
+        end = tuple(req.end) if (req.end and not req.loop) else None
         cents = [idx.centroid(c) for c in planned]
-        ordered_pts = planning_mod.plan_order(cents, loop=req.loop)
+        ordered_pts = planning_mod.order_areas(
+            cents, loop=req.loop, start=start, end=end
+        )
         code_by_pt = {cents[i]: planned[i] for i in range(len(planned))}
         ordered_codes = [code_by_pt[p] for p in ordered_pts]
-        # Route through an entry point near the corridor (midpoint of neighbours)
-        # rather than each area's centre, so big areas aren't deep detours.
-        n = len(ordered_pts)
-        waypoints = []
-        for i in range(n):
-            if req.loop:
-                prev, nxt = ordered_pts[(i - 1) % n], ordered_pts[(i + 1) % n]
-            else:
-                prev, nxt = ordered_pts[max(0, i - 1)], ordered_pts[min(n - 1, i + 1)]
-            target = ((prev[0] + nxt[0]) / 2, (prev[1] + nxt[1]) / 2)
-            waypoints.append(idx.entry_point(ordered_codes[i], target))
-        if req.loop:
-            waypoints.append(waypoints[0])
+        # Thread the route through each area with entry/exit waypoints, anchored
+        # out from / back to the start (loop) or start→end (point-to-point), so
+        # it flows instead of diving into each centre and back out again.
+        waypoints = planning_mod.through_waypoints(
+            ordered_codes, idx, loop=req.loop, start=start, end=end
+        )
         try:
             result = routing_mod.route(
                 waypoints,
@@ -317,7 +316,7 @@ def create_app(
 
     @app.post("/api/export/track")
     def export_track(req: TrackRequest):
-        xml = build_gpx(req.points, req.name)
+        xml = build_gpx(req.points, req.name, track_type=settings.gpx_track_type or None)
         return Response(
             content=xml,
             media_type="application/gpx+xml",

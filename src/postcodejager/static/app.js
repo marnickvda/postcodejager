@@ -31,6 +31,8 @@ function saveToken(t) {
 }
 const saveCollected = () => lsSet("collected", [...collectedSet]);
 const savePlanned = () => lsSet("planned", [...selectedSet]);
+const saveStart = () => (startPoint ? lsSet("startPoint", startPoint) : lsDel("startPoint"));
+const saveEnd = () => (endPoint ? lsSet("endPoint", endPoint) : lsDel("endPoint"));
 
 async function postJSON(url, obj) {
   const res = await fetch(url, {
@@ -71,6 +73,11 @@ let importedLayer = null;
 const selMarkers = {}; // code -> checkmark marker
 let lastRoutePoints = null;
 let lastClearedSelection = null;
+let startPoint = lsGet("startPoint", null); // [lat, lon] or null — route start/home
+let endPoint = lsGet("endPoint", null); // [lat, lon] or null — point-to-point finish
+let startMarker = null;
+let endMarker = null;
+let placeMode = null; // "start" | "end" | null — next map click sets that point
 
 // Cache-buster for the day-cached geometry endpoints. Bump when the shape of
 // the served features changes (e.g. a new property) so clients refetch instead
@@ -237,7 +244,13 @@ async function loadGeometry() {
         hideHint();
         layer.setStyle(pc4Style(f));
       });
-      layer.on("click", () => toggleSelect(code, layer));
+      layer.on("click", (e) => {
+        if (placeMode) {
+          placeEndpointAt(e.latlng);
+          return; // placing a start/end pin, not toggling this postcode
+        }
+        toggleSelect(code, layer);
+      });
     },
   }).addTo(map);
   // restore persisted selection markers
@@ -488,6 +501,11 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("keyup", (e) => {
   if (e.key === "Shift") map.getContainer().classList.remove("box-mode");
 });
+// A plain click while placing a start/end point sets it (clicks that miss every
+// PC4 polygon only reach the map, so this catches those).
+map.on("click", (e) => {
+  if (placeMode) placeEndpointAt(e.latlng);
+});
 map.on("mousedown", (e) => {
   if (!e.originalEvent.shiftKey || !pc4Layer) return;
   hideHint();
@@ -584,6 +602,84 @@ async function sync({ background = false } = {}) {
   }
 }
 
+// === Route start / end points ===============================================
+const isLoop = () => document.getElementById("loop-toggle").checked;
+const fmtCoord = (p) => (p ? `${p[0].toFixed(4)}, ${p[1].toFixed(4)}` : "niet gezet");
+
+function endpointIcon(label, cls) {
+  return L.divIcon({
+    className: "route-pin " + cls,
+    html: label,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+  });
+}
+
+function makeEndpointMarker(point, label, cls, onMove) {
+  const marker = L.marker(point, {
+    icon: endpointIcon(label, cls),
+    draggable: true,
+    zIndexOffset: 1000,
+    keyboard: false,
+  }).addTo(map);
+  marker.on("dragend", () => {
+    const ll = marker.getLatLng();
+    onMove([ll.lat, ll.lng]);
+    saveStart();
+    saveEnd();
+    updateEndpointUI();
+  });
+  return marker;
+}
+
+function renderEndpoints() {
+  if (startMarker) map.removeLayer(startMarker);
+  startMarker = startPoint
+    ? makeEndpointMarker(startPoint, "S", "pin-start", (p) => (startPoint = p))
+    : null;
+  if (endMarker) map.removeLayer(endMarker);
+  endMarker =
+    endPoint && !isLoop()
+      ? makeEndpointMarker(endPoint, "F", "pin-end", (p) => (endPoint = p))
+      : null;
+  updateEndpointUI();
+}
+
+function updateEndpointUI() {
+  document.getElementById("end-row").classList.toggle("hidden", isLoop());
+  document.getElementById("start-coord").textContent = fmtCoord(startPoint);
+  document.getElementById("end-coord").textContent = fmtCoord(endPoint);
+  document.getElementById("clear-start-btn").classList.toggle("hidden", !startPoint);
+  document.getElementById("clear-end-btn").classList.toggle("hidden", !endPoint);
+}
+
+function setPlaceMode(mode) {
+  placeMode = mode;
+  map.getContainer().classList.toggle("placing", !!mode);
+  document.getElementById("set-start-btn").setAttribute("aria-pressed", String(mode === "start"));
+  document.getElementById("set-end-btn").setAttribute("aria-pressed", String(mode === "end"));
+  if (mode) {
+    showMessage(`Klik op de kaart om het ${mode === "start" ? "startpunt" : "eindpunt"} te zetten.`);
+  }
+}
+
+// Set the pending start/end from a map click. placeMode is consumed (set to
+// null), so a duplicate event from a polygon + map click is harmless.
+function placeEndpointAt(latlng) {
+  if (placeMode === "start") {
+    startPoint = [latlng.lat, latlng.lng];
+    saveStart();
+  } else if (placeMode === "end") {
+    endPoint = [latlng.lat, latlng.lng];
+    saveEnd();
+  } else {
+    return;
+  }
+  setPlaceMode(null);
+  clearMessage();
+  renderEndpoints();
+}
+
 // === Route + GPX =============================================================
 async function computeRoute() {
   clearMessage();
@@ -595,10 +691,13 @@ async function computeRoute() {
   btn.disabled = true;
   btn.textContent = "Bezig…";
   try {
+    const loop = isLoop();
     const data = await postJSON("/api/route/auto", {
       planned: [...selectedSet],
       collected: [...collectedSet],
-      loop: document.getElementById("loop-toggle").checked,
+      loop,
+      start: startPoint,
+      end: loop ? null : endPoint,
     });
     if (routeLayer) map.removeLayer(routeLayer);
     routeLayer = L.geoJSON(data.geojson, {
@@ -695,8 +794,26 @@ document
   .addEventListener("click", () => document.getElementById("gpx-input").click());
 document.getElementById("gpx-input").addEventListener("change", onGpxChosen);
 document.getElementById("import-clear").addEventListener("click", clearImport);
+document
+  .getElementById("set-start-btn")
+  .addEventListener("click", () => setPlaceMode(placeMode === "start" ? null : "start"));
+document
+  .getElementById("set-end-btn")
+  .addEventListener("click", () => setPlaceMode(placeMode === "end" ? null : "end"));
+document.getElementById("clear-start-btn").addEventListener("click", () => {
+  startPoint = null;
+  saveStart();
+  renderEndpoints();
+});
+document.getElementById("clear-end-btn").addEventListener("click", () => {
+  endPoint = null;
+  saveEnd();
+  renderEndpoints();
+});
+document.getElementById("loop-toggle").addEventListener("change", renderEndpoints);
 
 renderStatus();
+renderEndpoints();
 loadGeometry();
 handleOAuthRedirect().then(() => {
   if (token) sync({ background: true });

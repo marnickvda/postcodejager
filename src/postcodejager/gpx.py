@@ -26,13 +26,22 @@ def parse_gpx_points(xml: str) -> list[tuple[float, float]]:
     return points
 
 
-def build_gpx(points: list[tuple[float, float]], name: str) -> str:
-    """Return GPX 1.1 XML for a single track through the ``(lat, lon)`` points."""
+def build_gpx(
+    points: list[tuple[float, float]], name: str, track_type: str | None = None
+) -> str:
+    """Return GPX 1.1 XML for a single track through the ``(lat, lon)`` points.
+
+    ``track_type`` sets the optional ``<type>`` discipline hint (e.g. ``cycling``)
+    that import apps like Strava/Komoot read to pre-select the sport. Left unset,
+    the track stays neutral so it sideloads cleanly to any bike computer.
+    """
     gpx = gpxpy.gpx.GPX()
     gpx.version = "1.1"
     gpx.creator = "Postcodejager"
 
     track = gpxpy.gpx.GPXTrack(name=name)
+    if track_type:
+        track.type = track_type
     gpx.tracks.append(track)
     segment = gpxpy.gpx.GPXTrackSegment()
     track.segments.append(segment)

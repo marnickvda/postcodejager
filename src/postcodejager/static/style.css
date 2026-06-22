@@ -208,6 +208,62 @@ body {
   gap: 8px;
 }
 
+/* Route start/end controls */
+.endpoints {
+  display: grid;
+  gap: 8px;
+  margin: 4px 0 2px;
+}
+
+.endpoint-actions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.btn-sm {
+  padding: 5px 9px;
+  font-size: 13px;
+}
+
+.icon-btn {
+  padding: 4px 9px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* Active "Op kaart" button while you're about to drop a pin. */
+.btn[aria-pressed="true"] {
+  background: var(--orange);
+  border-color: var(--orange);
+  color: #fff;
+}
+
+.leaflet-container.placing {
+  cursor: crosshair;
+}
+
+/* Start (S) / finish (F) pins: a labelled dot, distinct from area checkmarks. */
+.route-pin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--green);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  box-shadow: 0 1px 3px rgba(20, 23, 28, 0.45);
+}
+
+.route-pin.pin-end {
+  background: #1565c0; /* matches the drawn route line */
+}
+
 .percent {
   font-size: 20px;
   font-weight: 700;

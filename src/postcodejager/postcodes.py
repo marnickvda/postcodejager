@@ -13,9 +13,10 @@ from shapely.strtree import STRtree
 # Property keys that may hold the 4-digit code across data sources.
 CODE_PROP_CANDIDATES = ("postcode", "pc4", "pc4_code", "PC4", "postcode4")
 
-# How far inside an area we aim to route, so a leg dips meaningfully into the
-# postcode instead of clipping its edge. Capped by how deep the area allows.
-MIN_ENTRY_DEPTH_M = 1000.0
+# How far inside an area we aim to place a routing waypoint: deep enough that
+# the leg registers the postcode robustly, shallow enough that the route flows
+# through instead of diving in and back out. Capped by how deep the area allows.
+ENTRY_DEPTH_M = 250.0
 _M_PER_DEG_LAT = 111_320.0  # metres per degree of latitude (≈constant)
 
 
@@ -79,27 +80,27 @@ class PC4Index:
         return self._provinces.get(code)
 
     def entry_point(
-        self, code: str, target: tuple[float, float]
+        self, code: str, target: tuple[float, float], depth_m: float = ENTRY_DEPTH_M
     ) -> tuple[float, float]:
-        """A point well inside area ``code`` near the route corridor ``target``.
+        """A point inside area ``code`` near the route corridor ``target``.
 
         ``target`` is a ``(lat, lon)`` hint for where the route passes. We aim
         for the closest point to that corridor that still lies at least
-        ``MIN_ENTRY_DEPTH_M`` from the boundary, so each leg dips meaningfully
-        into the postcode instead of clipping its edge — while staying on the
-        corridor side rather than detouring to the centre. Areas too small to
-        hold such a point fall back to going as deep as they allow.
+        ``depth_m`` from the boundary, so each leg dips meaningfully into the
+        postcode instead of clipping its edge — while staying on the corridor
+        side rather than detouring to the centre. Areas too small to hold such a
+        point fall back to going as deep as they allow.
         """
         poly = self._polys[code]
         tp = Point(target[1], target[0])
         # Express the target depth in degrees using the (shorter) longitude
-        # scale, so the guaranteed clearance is at least MIN_ENTRY_DEPTH_M in
-        # every direction. Buffering inward shrinks the area by that band; any
-        # point left inside is then >= the target depth from the edge.
+        # scale, so the guaranteed clearance is at least ``depth_m`` in every
+        # direction. Buffering inward shrinks the area by that band; any point
+        # left inside is then >= the target depth from the edge.
         m_per_deg = _M_PER_DEG_LAT * math.cos(math.radians(target[0]))
-        depth_deg = MIN_ENTRY_DEPTH_M / m_per_deg
+        depth_deg = depth_m / m_per_deg
         inner = poly.buffer(-depth_deg)
-        # Thin areas can't hold a 1 km-deep point; relax until something is left.
+        # Thin areas can't hold a point at the target depth; relax until one fits.
         while inner.is_empty and depth_deg > 1e-5:
             depth_deg /= 2
             inner = poly.buffer(-depth_deg)

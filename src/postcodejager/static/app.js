@@ -72,6 +72,34 @@ const selMarkers = {}; // code -> checkmark marker
 let lastRoutePoints = null;
 let lastClearedSelection = null;
 
+// === Provinces ===============================================================
+const PROVINCE_COLORS = {
+  Drenthe: "#9A6324",
+  Flevoland: "#42A5F5",
+  Fryslân: "#1B998B",
+  Gelderland: "#E6194B",
+  Groningen: "#F032E6",
+  Limburg: "#911EB4",
+  "Noord-Brabant": "#000075",
+  "Noord-Holland": "#800000",
+  Overijssel: "#808000",
+  Utrecht: "#BC5090",
+  Zeeland: "#00838F",
+  "Zuid-Holland": "#3D348B",
+};
+const PROVINCE_UNKNOWN = "Onbekend";
+const PROVINCE_UNKNOWN_COLOR = "#9aa0a6";
+
+let provinceLayer = null;
+const codeProvince = new Map(); // PC4 code -> province name
+
+function provinceColor(name) {
+  return PROVINCE_COLORS[name] || PROVINCE_UNKNOWN_COLOR;
+}
+function provinceOf(code) {
+  return codeProvince.get(code) || PROVINCE_UNKNOWN;
+}
+
 // --- map legend (static content) --------------------------------------------
 const legend = L.control({ position: "bottomleft" });
 legend.onAdd = () => {
@@ -194,6 +222,7 @@ async function loadGeometry() {
     style: pc4Style,
     onEachFeature: (f, layer) => {
       const code = f.properties.postcode;
+      if (f.properties.prov) codeProvince.set(code, f.properties.prov);
       layer.on("mousemove", (e) => showHint(e.containerPoint, featureLabel(f)));
       layer.on("mouseover", () => {
         if (!selectedSet.has(code)) layer.setStyle({ weight: 3, color: "#5f6368" });
@@ -214,6 +243,7 @@ async function loadGeometry() {
   renderStatus();
   refreshSelectionUI();
   loadProvinces();
+  loadProvinceBoundaries();
 }
 
 async function loadProvinces() {
@@ -243,6 +273,21 @@ async function loadProvinces() {
     li.append(head, bar);
     list.appendChild(li);
   }
+}
+
+async function loadProvinceBoundaries() {
+  const geo = await (await fetch("/api/provinces/geometry")).json();
+  if (provinceLayer) map.removeLayer(provinceLayer);
+  provinceLayer = L.geoJSON(geo, {
+    interactive: false, // clicks pass through to the postcode areas beneath
+    style: (f) => ({
+      color: provinceColor(f.properties.name),
+      weight: 3,
+      opacity: 0.9,
+      fill: false,
+    }),
+  }).addTo(map);
+  provinceLayer.bringToFront();
 }
 
 // === Selection ===============================================================

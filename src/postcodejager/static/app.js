@@ -748,7 +748,34 @@ function deleteHandle(i) {
   editWaypoints.splice(i, 1);
   reroute();
 }
-function renderGhosts() {} // Task 4
+function ghostPairs() {
+  const n = editWaypoints.length;
+  const pairs = [];
+  for (let i = 0; i < n - 1; i++) pairs.push([i, i + 1]);
+  if (lastLoop && n >= 2) pairs.push([n - 1, 0]); // closing leg
+  return pairs;
+}
+
+function renderGhosts() {
+  ghostPairs().forEach(([a, b]) => {
+    const pa = editWaypoints[a].ll;
+    const pb = editWaypoints[b].ll;
+    const mid = [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2];
+    const g = L.marker(mid, {
+      icon: L.divIcon({ className: "route-ghost", iconSize: [12, 12], iconAnchor: [6, 6] }),
+      draggable: true,
+      zIndexOffset: 1100,
+      keyboard: false,
+    }).addTo(map);
+    g.on("dragend", () => {
+      const ll = g.getLatLng();
+      const at = b === 0 ? editWaypoints.length : b; // closing leg inserts at the end
+      editWaypoints.splice(at, 0, { ll: [ll.lat, ll.lng], via: true });
+      reroute();
+    });
+    ghostMarkers.push(g);
+  });
+}
 
 async function reroute() {
   if (rerouteInFlight) {

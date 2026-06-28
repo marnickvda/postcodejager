@@ -892,3 +892,11 @@ kbd {
 .route-handle.h-anchor { background: #1565c0; }
 .route-handle.h-via { background: #e85d0a; }
 .leaflet-container.editing { cursor: default; }
+
+.route-ghost {
+  border-radius: 50%;
+  background: #1565c0;
+  opacity: 0.4;
+  border: 1px dashed #fff;
+  cursor: grab;
+}

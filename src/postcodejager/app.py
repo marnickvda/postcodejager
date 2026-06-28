@@ -59,6 +59,11 @@ class RouteRequest(BaseModel):
     end: tuple[float, float] | None = None  # (lat, lon) finish for a point-to-point
 
 
+class ManualRouteRequest(BaseModel):
+    waypoints: list[tuple[float, float]]  # ordered (lat, lon)
+    collected: list[str] = []
+
+
 class CollectedRequest(BaseModel):
     collected: list[str] = []
 
@@ -308,6 +313,40 @@ def create_app(
             "new_count": len(new),
             "new_codes": sorted(new),
             "selected_count": len(planned),
+            "waypoints": [list(w) for w in waypoints],
+        }
+
+    @app.post("/api/route/manual")
+    def route_manual(req: ManualRouteRequest):
+        idx = index_provider()
+        waypoints = [tuple(w) for w in req.waypoints]
+        if len(waypoints) < 2:
+            raise HTTPException(
+                status_code=400,
+                detail="Een route heeft minstens 2 punten nodig",
+            )
+        try:
+            result = routing_mod.route(
+                waypoints,
+                base_url=settings.brouter_base_url,
+                profile=settings.brouter_profile,
+            )
+        except Exception as exc:
+            logger.warning("route_manual failed: %r", exc)
+            raise HTTPException(
+                status_code=502,
+                detail=(
+                    "Routeren mislukt. Liggen de punten te ver uit elkaar of is "
+                    "de routeserver even niet bereikbaar? Probeer het opnieuw."
+                ),
+            )
+        new = routing_mod.new_postcodes(result.points, idx, set(req.collected))
+        return {
+            "geojson": _line(result.points),
+            "distance_m": result.distance_m,
+            "new_count": len(new),
+            "new_codes": sorted(new),
+            "waypoints": [list(w) for w in waypoints],
         }
 
     @app.post("/api/import/gpx")

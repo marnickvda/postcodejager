@@ -142,6 +142,56 @@ def test_route_auto_hides_raw_error():
     assert "brouter-internal-boom" not in r.json()["detail"]
 
 
+def test_route_auto_returns_waypoints():
+    with respx.mock(assert_all_mocked=False) as router:
+        router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
+            return_value=httpx.Response(200, json=BROUTER_GEOJSON)
+        )
+        r = client().post(
+            "/api/route/auto",
+            json={"planned": ["1011", "1012"], "loop": True},
+        )
+    body = r.json()
+    assert isinstance(body["waypoints"], list)
+    assert len(body["waypoints"]) >= 2
+    assert all(len(p) == 2 for p in body["waypoints"])  # [lat, lon] pairs
+
+
+def test_route_manual_routes_through_waypoints():
+    with respx.mock(assert_all_mocked=False) as router:
+        router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
+            return_value=httpx.Response(200, json=BROUTER_GEOJSON)
+        )
+        r = client().post(
+            "/api/route/manual",
+            json={"waypoints": [[52.37, 4.90], [52.37, 4.93]], "collected": []},
+        )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["distance_m"] == 3500.0
+    assert body["waypoints"] == [[52.37, 4.90], [52.37, 4.93]]
+    assert "geometry" in body["geojson"]
+    assert isinstance(body["new_count"], int)
+
+
+def test_route_manual_requires_at_least_two():
+    r = client().post("/api/route/manual", json={"waypoints": [[52.37, 4.90]]})
+    assert r.status_code == 400
+
+
+def test_route_manual_hides_raw_error():
+    with respx.mock(assert_all_mocked=False) as router:
+        router.get(url__regex=r"https://brouter\.test/brouter.*").mock(
+            return_value=httpx.Response(500, text="brouter-internal-boom")
+        )
+        r = client().post(
+            "/api/route/manual",
+            json={"waypoints": [[52.37, 4.90], [52.37, 4.93]]},
+        )
+    assert r.status_code == 502
+    assert "brouter-internal-boom" not in r.json()["detail"]
+
+
 def test_import_gpx_returns_crossed():
     gpx = build_gpx([(52.37, 4.905), (52.37, 4.935)], "Rit")
     body = client().post(

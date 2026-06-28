@@ -729,9 +729,10 @@ function renderHandles() {
       keyboard: false,
     }).addTo(map);
     m.on("dragend", () => {
+      const prev = cloneWaypoints();
       const ll = m.getLatLng();
       editWaypoints[i].ll = [ll.lat, ll.lng];
-      reroute();
+      reroute(prev);
     });
     m.on("click", () => deleteHandle(i)); // no-op until Task 3
     handleMarkers.push(m);
@@ -745,8 +746,9 @@ function deleteHandle(i) {
   const role = handleRole(i);
   if (role === "start" || role === "end") return; // anchors aren't deletable
   if (editWaypoints.length <= 2) return; // keep a routable minimum
+  const prev = cloneWaypoints();
   editWaypoints.splice(i, 1);
-  reroute();
+  reroute(prev);
 }
 function ghostPairs() {
   const n = editWaypoints.length;
@@ -768,22 +770,25 @@ function renderGhosts() {
       keyboard: false,
     }).addTo(map);
     g.on("dragend", () => {
+      const prev = cloneWaypoints();
       const ll = g.getLatLng();
       const at = b === 0 ? editWaypoints.length : b; // closing leg inserts at the end
       editWaypoints.splice(at, 0, { ll: [ll.lat, ll.lng], via: true });
-      reroute();
+      reroute(prev);
     });
     ghostMarkers.push(g);
   });
 }
 
-async function reroute() {
+const cloneWaypoints = () => editWaypoints.map((w) => ({ ll: [...w.ll], via: w.via }));
+
+async function reroute(revertTo) {
   if (rerouteInFlight) {
     reroutePending = true;
     return;
   }
   rerouteInFlight = true;
-  const snapshot = editWaypoints.map((w) => ({ ll: [...w.ll], via: w.via }));
+  const snapshot = revertTo || cloneWaypoints();
   const editBtn = document.getElementById("edit-btn");
   editBtn.textContent = "Bezig…";
   try {

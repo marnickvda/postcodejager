@@ -79,6 +79,17 @@ let startMarker = null;
 let endMarker = null;
 let placeMode = null; // "start" | "end" | null — next map click sets that point
 
+// --- route editing (session-only) ---
+let editMode = false;
+let editWaypoints = []; // [{ ll: [lat, lon], via: bool }] — distinct, no loop-close dup
+let lastWaypoints = null; // raw waypoints from the last route (loops include the closing dup)
+let lastLoop = true; // loop-ness of the last computed route
+let baseNewCount = 0; // new_count of the last computed route — the edit baseline
+let handleMarkers = []; // draggable waypoint handles
+let ghostMarkers = []; // midpoint "insert a via" ghosts
+let rerouteInFlight = false;
+let reroutePending = false;
+
 // Cache-buster for the day-cached geometry endpoints. Bump when the shape of
 // the served features changes (e.g. a new property) so clients refetch instead
 // of serving a stale copy. v2 added each area's `prov` (province) field.
@@ -245,6 +256,7 @@ async function loadGeometry() {
         layer.setStyle(pc4Style(f));
       });
       layer.on("click", (e) => {
+        if (editMode) return; // editing handles, not toggling postcodes
         if (placeMode) {
           placeEndpointAt(e.latlng);
           return; // placing a start/end pin, not toggling this postcode
@@ -507,6 +519,7 @@ map.on("click", (e) => {
   if (placeMode) placeEndpointAt(e.latlng);
 });
 map.on("mousedown", (e) => {
+  if (editMode) return; // no shift-drag selection while editing the route
   if (!e.originalEvent.shiftKey || !pc4Layer) return;
   hideHint();
   boxStart = e.latlng;
@@ -680,6 +693,124 @@ function placeEndpointAt(latlng) {
   renderEndpoints();
 }
 
+// === Route editing ===========================================================
+const ROLE_CLASS = { start: "h-start", end: "h-end", via: "h-via", anchor: "h-anchor" };
+
+function setRouteNew(cur) {
+  const el = document.getElementById("route-new");
+  el.textContent = (cur !== baseNewCount ? `${baseNewCount} → ${cur}` : `${cur}`) + " nieuw";
+}
+
+function handleRole(i) {
+  const n = editWaypoints.length;
+  if (startPoint && i === 0) return "start";
+  if (!lastLoop && endPoint && i === n - 1) return "end";
+  return editWaypoints[i].via ? "via" : "anchor";
+}
+
+function clearHandles() {
+  handleMarkers.forEach((m) => map.removeLayer(m));
+  ghostMarkers.forEach((m) => map.removeLayer(m));
+  handleMarkers = [];
+  ghostMarkers = [];
+}
+
+function renderHandles() {
+  clearHandles();
+  editWaypoints.forEach((w, i) => {
+    const m = L.marker(w.ll, {
+      icon: L.divIcon({
+        className: "route-handle " + ROLE_CLASS[handleRole(i)],
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      }),
+      draggable: true,
+      zIndexOffset: 1200,
+      keyboard: false,
+    }).addTo(map);
+    m.on("dragend", () => {
+      const ll = m.getLatLng();
+      editWaypoints[i].ll = [ll.lat, ll.lng];
+      reroute();
+    });
+    m.on("click", () => deleteHandle(i)); // no-op until Task 3
+    handleMarkers.push(m);
+  });
+  renderGhosts(); // no-op until Task 4
+}
+
+// Filled in by later tasks; defined now so renderHandles() is written once.
+function deleteHandle(i) {} // Task 3
+function renderGhosts() {} // Task 4
+
+async function reroute() {
+  if (rerouteInFlight) {
+    reroutePending = true;
+    return;
+  }
+  rerouteInFlight = true;
+  const snapshot = editWaypoints.map((w) => ({ ll: [...w.ll], via: w.via }));
+  const editBtn = document.getElementById("edit-btn");
+  editBtn.textContent = "Bezig…";
+  try {
+    const pts = editWaypoints.map((w) => w.ll);
+    if (lastLoop) pts.push(editWaypoints[0].ll); // re-close the loop
+    const data = await postJSON("/api/route/manual", {
+      waypoints: pts,
+      collected: [...collectedSet],
+    });
+    if (routeLayer) map.removeLayer(routeLayer);
+    routeLayer = L.geoJSON(data.geojson, {
+      style: { color: "#1565c0", weight: 4, opacity: 0.9 },
+    }).addTo(map);
+    lastRoutePoints = data.geojson.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+    document.getElementById("route-distance").textContent =
+      (data.distance_m / 1000).toFixed(1) + " km";
+    setRouteNew(data.new_count);
+  } catch (e) {
+    editWaypoints = snapshot; // revert so handles match the unchanged line
+    showMessage("Routeren mislukt: " + e.message, true);
+  } finally {
+    rerouteInFlight = false;
+    editBtn.textContent = "Klaar met aanpassen";
+    renderHandles();
+    if (reroutePending) {
+      reroutePending = false;
+      reroute();
+    }
+  }
+}
+
+function enterEditMode() {
+  if (!lastWaypoints) return;
+  editMode = true;
+  const seed = lastLoop ? lastWaypoints.slice(0, -1) : lastWaypoints.slice();
+  editWaypoints = seed.map((ll) => ({ ll: [ll[0], ll[1]], via: false }));
+  if (startMarker) {
+    map.removeLayer(startMarker);
+    startMarker = null;
+  }
+  if (endMarker) {
+    map.removeLayer(endMarker);
+    endMarker = null;
+  }
+  map.getContainer().classList.add("editing");
+  document.getElementById("edit-btn").textContent = "Klaar met aanpassen";
+  renderHandles();
+}
+
+function exitEditMode() {
+  editMode = false;
+  clearHandles();
+  map.getContainer().classList.remove("editing");
+  document.getElementById("edit-btn").textContent = "Route aanpassen";
+  renderEndpoints(); // restore the start/end markers
+}
+
+function toggleEditMode() {
+  editMode ? exitEditMode() : enterEditMode();
+}
+
 // === Route + GPX =============================================================
 async function computeRoute() {
   clearMessage();
@@ -704,9 +835,13 @@ async function computeRoute() {
       style: { color: "#1565c0", weight: 4, opacity: 0.9 },
     }).addTo(map);
     lastRoutePoints = data.geojson.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+    lastWaypoints = data.waypoints;
+    lastLoop = loop;
+    baseNewCount = data.new_count;
+    if (editMode) exitEditMode(); // a fresh compute resets any edit session
     document.getElementById("route-distance").textContent =
       (data.distance_m / 1000).toFixed(1) + " km";
-    document.getElementById("route-new").textContent = data.new_count + " nieuw";
+    setRouteNew(data.new_count);
     document.getElementById("route-result").classList.remove("hidden");
   } catch (e) {
     showMessage("Routeren mislukt: " + e.message, true);
@@ -789,6 +924,7 @@ document.getElementById("refresh-btn").addEventListener("click", () => sync());
 document.getElementById("route-btn").addEventListener("click", computeRoute);
 document.getElementById("clear-btn").addEventListener("click", clearSelection);
 document.getElementById("export-btn").addEventListener("click", exportGpx);
+document.getElementById("edit-btn").addEventListener("click", toggleEditMode);
 document
   .getElementById("import-btn")
   .addEventListener("click", () => document.getElementById("gpx-input").click());

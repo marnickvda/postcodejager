@@ -879,3 +879,16 @@ kbd {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Route editing handles */
+.route-handle {
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+.route-handle.h-start { background: #2e7d32; }
+.route-handle.h-end { background: #c62828; }
+.route-handle.h-anchor { background: #1565c0; }
+.route-handle.h-via { background: #e85d0a; }
+.leaflet-container.editing { cursor: default; }

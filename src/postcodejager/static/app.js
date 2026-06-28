@@ -740,7 +740,14 @@ function renderHandles() {
 }
 
 // Filled in by later tasks; defined now so renderHandles() is written once.
-function deleteHandle(i) {} // Task 3
+function deleteHandle(i) {
+  if (!editMode) return;
+  const role = handleRole(i);
+  if (role === "start" || role === "end") return; // anchors aren't deletable
+  if (editWaypoints.length <= 2) return; // keep a routable minimum
+  editWaypoints.splice(i, 1);
+  reroute();
+}
 function renderGhosts() {} // Task 4
 
 async function reroute() {

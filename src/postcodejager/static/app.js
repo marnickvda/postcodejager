@@ -772,11 +772,15 @@ async function reroute() {
     showMessage("Routeren mislukt: " + e.message, true);
   } finally {
     rerouteInFlight = false;
-    editBtn.textContent = "Klaar met aanpassen";
-    renderHandles();
-    if (reroutePending) {
+    if (editMode) {
+      editBtn.textContent = "Klaar met aanpassen";
+      renderHandles();
+      if (reroutePending) {
+        reroutePending = false;
+        reroute();
+      }
+    } else {
       reroutePending = false;
-      reroute();
     }
   }
 }

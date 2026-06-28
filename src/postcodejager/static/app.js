@@ -798,6 +798,7 @@ async function reroute() {
       style: { color: "#1565c0", weight: 4, opacity: 0.9 },
     }).addTo(map);
     lastRoutePoints = data.geojson.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+    lastWaypoints = data.waypoints;
     document.getElementById("route-distance").textContent =
       (data.distance_m / 1000).toFixed(1) + " km";
     setRouteNew(data.new_count);

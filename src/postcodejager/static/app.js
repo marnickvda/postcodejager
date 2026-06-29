@@ -67,6 +67,11 @@ L.tileLayer(
   }
 ).addTo(map);
 
+// Dedicated pane so the computed route always draws above the postcode polygons
+// (overlayPane, z 400) yet below the markers/handles (markerPane, z 600) — no
+// more fighting with selection restyles or hover bringToFront().
+map.createPane("route").style.zIndex = 450;
+
 let pc4Layer = null;
 let routeLayer = null;
 let importedLayer = null;
@@ -80,7 +85,10 @@ let endMarker = null;
 let placeMode = null; // "start" | "end" | null — next map click sets that point
 
 // --- route editing (session-only) ---
-let editMode = false;
+// Handles are always shown while a route exists (no toggle); `handlesActive`
+// tracks that state so renderEndpoints() knows to hide the S/F pins.
+let handlesActive = false;
+let routeGen = 0; // bumped per route request; a stale response is discarded
 let editWaypoints = []; // [{ ll: [lat, lon], via: bool }] — distinct, no loop-close dup
 let lastWaypoints = null; // raw waypoints from the last route (loops include the closing dup)
 let lastLoop = true; // loop-ness of the last computed route
@@ -256,7 +264,6 @@ async function loadGeometry() {
         layer.setStyle(pc4Style(f));
       });
       layer.on("click", (e) => {
-        if (editMode) return; // editing handles, not toggling postcodes
         if (placeMode) {
           placeEndpointAt(e.latlng);
           return; // placing a start/end pin, not toggling this postcode
@@ -459,6 +466,11 @@ function clearRoute() {
     routeLayer = null;
   }
   lastRoutePoints = null;
+  if (handlesActive) {
+    handlesActive = false;
+    clearHandles();
+    renderEndpoints(); // bring the S/F pins back now that the handles are gone
+  }
   document.getElementById("route-result").classList.add("hidden");
 }
 
@@ -519,7 +531,6 @@ map.on("click", (e) => {
   if (placeMode) placeEndpointAt(e.latlng);
 });
 map.on("mousedown", (e) => {
-  if (editMode) return; // no shift-drag selection while editing the route
   if (!e.originalEvent.shiftKey || !pc4Layer) return;
   hideHint();
   boxStart = e.latlng;
@@ -647,14 +658,19 @@ function makeEndpointMarker(point, label, cls, onMove) {
 
 function renderEndpoints() {
   if (startMarker) map.removeLayer(startMarker);
-  startMarker = startPoint
-    ? makeEndpointMarker(startPoint, "S", "pin-start", (p) => (startPoint = p))
-    : null;
   if (endMarker) map.removeLayer(endMarker);
-  endMarker =
-    endPoint && !isLoop()
-      ? makeEndpointMarker(endPoint, "F", "pin-end", (p) => (endPoint = p))
+  startMarker = endMarker = null;
+  // While the route handles are shown, the start/end handles stand in for the
+  // S/F pins — don't draw both.
+  if (!handlesActive) {
+    startMarker = startPoint
+      ? makeEndpointMarker(startPoint, "S", "pin-start", (p) => (startPoint = p))
       : null;
+    endMarker =
+      endPoint && !isLoop()
+        ? makeEndpointMarker(endPoint, "F", "pin-end", (p) => (endPoint = p))
+        : null;
+  }
   updateEndpointUI();
 }
 
@@ -742,7 +758,7 @@ function renderHandles() {
 
 // Filled in by later tasks; defined now so renderHandles() is written once.
 function deleteHandle(i) {
-  if (!editMode) return;
+  if (!handlesActive) return;
   const role = handleRole(i);
   if (role === "start" || role === "end") return; // anchors aren't deletable
   if (editWaypoints.length <= 2) return; // keep a routable minimum
@@ -789,8 +805,8 @@ async function reroute(revertTo) {
   }
   rerouteInFlight = true;
   const snapshot = revertTo || cloneWaypoints();
-  const editBtn = document.getElementById("edit-btn");
-  editBtn.textContent = "Bezig…";
+  const myGen = ++routeGen; // claim this generation; a later request supersedes us
+  map.getContainer().classList.add("rerouting");
   try {
     const pts = editWaypoints.map((w) => w.ll);
     if (lastLoop) pts.push(editWaypoints[0].ll); // re-close the loop
@@ -798,9 +814,11 @@ async function reroute(revertTo) {
       waypoints: pts,
       collected: [...collectedSet],
     });
+    if (myGen !== routeGen) return; // a newer route request superseded this one
     if (routeLayer) map.removeLayer(routeLayer);
     routeLayer = L.geoJSON(data.geojson, {
       style: { color: "#1565c0", weight: 4, opacity: 0.9 },
+      pane: "route",
     }).addTo(map);
     lastRoutePoints = data.geojson.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
     lastWaypoints = data.waypoints;
@@ -808,12 +826,14 @@ async function reroute(revertTo) {
       (data.distance_m / 1000).toFixed(1) + " km";
     setRouteNew(data.new_count);
   } catch (e) {
-    editWaypoints = snapshot; // revert so handles match the unchanged line
-    showMessage("Routeren mislukt: " + e.message, true);
+    if (myGen === routeGen) {
+      editWaypoints = snapshot; // revert so handles match the unchanged line
+      showMessage("Routeren mislukt: " + e.message, true);
+    }
   } finally {
     rerouteInFlight = false;
-    if (editMode) {
-      editBtn.textContent = "Klaar met aanpassen";
+    map.getContainer().classList.remove("rerouting");
+    if (myGen === routeGen) {
       renderHandles();
       if (reroutePending) {
         reroutePending = false;
@@ -825,9 +845,12 @@ async function reroute(revertTo) {
   }
 }
 
-function enterEditMode() {
+// Seed the editable waypoints from the freshly computed route and show the
+// handles. Called automatically after every compute — handles are always on
+// while a route exists, so there is no enter/exit toggle.
+function showRouteHandles() {
   if (!lastWaypoints) return;
-  editMode = true;
+  handlesActive = true;
   const seed = lastLoop ? lastWaypoints.slice(0, -1) : lastWaypoints.slice();
   editWaypoints = seed.map((ll) => ({ ll: [ll[0], ll[1]], via: false }));
   if (startMarker) {
@@ -838,21 +861,7 @@ function enterEditMode() {
     map.removeLayer(endMarker);
     endMarker = null;
   }
-  map.getContainer().classList.add("editing");
-  document.getElementById("edit-btn").textContent = "Klaar met aanpassen";
   renderHandles();
-}
-
-function exitEditMode() {
-  editMode = false;
-  clearHandles();
-  map.getContainer().classList.remove("editing");
-  document.getElementById("edit-btn").textContent = "Route aanpassen";
-  renderEndpoints(); // restore the start/end markers
-}
-
-function toggleEditMode() {
-  editMode ? exitEditMode() : enterEditMode();
 }
 
 // === Route + GPX =============================================================
@@ -867,6 +876,7 @@ async function computeRoute() {
   btn.textContent = "Bezig…";
   try {
     const loop = isLoop();
+    const myGen = ++routeGen; // supersede any in-flight reroute from the old route
     const data = await postJSON("/api/route/auto", {
       planned: [...selectedSet],
       collected: [...collectedSet],
@@ -874,19 +884,21 @@ async function computeRoute() {
       start: startPoint,
       end: loop ? null : endPoint,
     });
+    if (myGen !== routeGen) return; // a newer route request superseded this one
     if (routeLayer) map.removeLayer(routeLayer);
     routeLayer = L.geoJSON(data.geojson, {
       style: { color: "#1565c0", weight: 4, opacity: 0.9 },
+      pane: "route",
     }).addTo(map);
     lastRoutePoints = data.geojson.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
     lastWaypoints = data.waypoints;
     lastLoop = loop;
     baseNewCount = data.new_count;
-    if (editMode) exitEditMode(); // a fresh compute resets any edit session
     document.getElementById("route-distance").textContent =
       (data.distance_m / 1000).toFixed(1) + " km";
     setRouteNew(data.new_count);
     document.getElementById("route-result").classList.remove("hidden");
+    showRouteHandles(); // handles are always on once a route exists
   } catch (e) {
     showMessage("Routeren mislukt: " + e.message, true);
   } finally {
@@ -968,7 +980,6 @@ document.getElementById("refresh-btn").addEventListener("click", () => sync());
 document.getElementById("route-btn").addEventListener("click", computeRoute);
 document.getElementById("clear-btn").addEventListener("click", clearSelection);
 document.getElementById("export-btn").addEventListener("click", exportGpx);
-document.getElementById("edit-btn").addEventListener("click", toggleEditMode);
 document
   .getElementById("import-btn")
   .addEventListener("click", () => document.getElementById("gpx-input").click());

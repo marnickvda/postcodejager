@@ -56,8 +56,8 @@ const map = L.map("map", {
 
 // Self-hosted Protomaps vector basemap (one .pmtiles file we serve at
 // /basemap/nl.pmtiles). protomaps-leaflet reads the archive via HTTP range and
-// renders labels itself — no glyph/sprite hosting. Flavor "light" ≈ the old
-// CARTO Voyager look; overzooms past the native z15.
+// renders labels itself — no glyph/sprite hosting. Flavor "light"; overzooms
+// past the native z15.
 protomapsL
   .leafletLayer({
     url: "/basemap/nl.pmtiles",

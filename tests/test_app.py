@@ -257,3 +257,26 @@ def test_sync_computes_collected():
     body = r.json()
     assert set(body["collected"]) == {"1011", "1012"}
     assert body["activities"] == 1
+
+
+def test_basemap_range_request_is_206_and_not_gzipped(tmp_path):
+    (tmp_path / "nl.pmtiles").write_bytes(b"PMTILESFIXTURE" + b"x" * 4000)
+    idx = PC4Index.from_geojson(json.loads(FIX.read_text()))
+    settings = load_settings(
+        {"DATA_DIR": str(tmp_path), "BROUTER_BASE_URL": "https://brouter.test/brouter"}
+    )
+    c = TestClient(create_app(settings, lambda: idx))
+    r = c.get("/basemap/nl.pmtiles", headers={"Range": "bytes=0-99"})
+    assert r.status_code == 206
+    assert r.headers["content-range"].startswith("bytes 0-99/")
+    assert "gzip" not in r.headers.get("content-encoding", "")
+    assert len(r.content) == 100
+
+
+def test_basemap_missing_returns_404(tmp_path):
+    idx = PC4Index.from_geojson(json.loads(FIX.read_text()))
+    settings = load_settings(
+        {"DATA_DIR": str(tmp_path), "BROUTER_BASE_URL": "https://brouter.test/brouter"}
+    )
+    c = TestClient(create_app(settings, lambda: idx))
+    assert c.get("/basemap/nl.pmtiles").status_code == 404

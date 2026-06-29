@@ -38,6 +38,17 @@ PROVINCE_GEOJSON = pathlib.Path(__file__).parent / "data" / "provinces.geojson"
 DISPLAY_SIMPLIFY = 0.001
 
 
+class _GZipExceptBasemap(GZipMiddleware):
+    """GZip every response except /basemap — gzipping a 206 partial response
+    corrupts the byte-range reads that PMTiles relies on."""
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http" and scope.get("path", "").startswith("/basemap/"):
+            await self.app(scope, receive, send)
+            return
+        await super().__call__(scope, receive, send)
+
+
 class ExchangeRequest(BaseModel):
     code: str
 
@@ -86,7 +97,7 @@ def create_app(
     rate_window: int = 60,
 ) -> FastAPI:
     app = FastAPI(title="Postcodejager")
-    app.add_middleware(GZipMiddleware, minimum_size=1000)
+    app.add_middleware(_GZipExceptBasemap, minimum_size=1000)
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
     # Simple per-IP rate limit on the API to curb abuse of the Strava/BRouter
@@ -162,6 +173,13 @@ def create_app(
     @app.get("/voorwaarden")
     def voorwaarden():
         return FileResponse(str(STATIC_DIR / "voorwaarden.html"))
+
+    @app.get("/basemap/nl.pmtiles")
+    def basemap():
+        path = pathlib.Path(settings.data_dir) / "nl.pmtiles"
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail="Basemap niet gevonden")
+        return FileResponse(str(path), media_type="application/octet-stream")
 
     @app.get("/auth/login")
     def login():

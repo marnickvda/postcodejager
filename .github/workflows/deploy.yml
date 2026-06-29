@@ -50,6 +50,7 @@ jobs:
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
           STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+          BASEMAP_PLANET_URL: ${{ secrets.BASEMAP_PLANET_URL }}
           REPO: ${{ github.repository }}
           REF: ${{ github.ref_name }}
         run: |
@@ -61,4 +62,5 @@ jobs:
             -e "branch=$REF" \
             -e "domain=$SERVER_HOST" \
             -e "strava_client_id=$STRAVA_CLIENT_ID" \
-            -e "strava_client_secret=$STRAVA_CLIENT_SECRET"
+            -e "strava_client_secret=$STRAVA_CLIENT_SECRET" \
+            -e "basemap_planet_url=$BASEMAP_PLANET_URL"

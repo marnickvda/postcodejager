@@ -489,6 +489,14 @@ body {
   text-decoration: underline;
 }
 
+/* Official "Powered by Strava" mark — required by Strava's brand guidelines.
+   Their artwork, shown unmodified; don't recolor or restyle it. */
+.powered-by-strava img {
+  height: 18px;
+  width: auto;
+  display: block;
+}
+
 .compleet-head {
   display: inline-flex;
   align-items: center;

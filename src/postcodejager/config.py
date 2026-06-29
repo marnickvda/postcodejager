@@ -3,7 +3,7 @@ import os
 import pathlib
 from dataclasses import dataclass
 
-# CBS PC4 areas (CC BY 4.0), served as GeoJSON via the Opendatasoft Explore API.
+# PC4 postcode areas (CBS / Kadaster, CC BY 4.0) via the OpenDataSoft Explore API.
 DEFAULT_PC4_URL = (
     "https://public.opendatasoft.com/api/explore/v2.1/catalog/datasets/"
     "georef-netherlands-postcode-pc4/exports/geojson"

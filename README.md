@@ -104,8 +104,11 @@ sturen dat gedrag:
 
 ## Databronnen & attributie
 
-- Postcodegrenzen: **CBS PC4** via PDOK/Opendatasoft — CC BY 4.0
-- Provinciegrenzen: **CBS provincies** via PDOK/Opendatasoft — CC BY 4.0
-  (meegeleverd in `src/postcodejager/data/provinces.geojson`)
-- Routing: **BRouter** op **OpenStreetMap**-data
-- Activiteiten: **Strava** (scope `activity:read_all`, alleen je eigen data)
+- Postcodegrenzen: **CBS / Kadaster (BAG)** via OpenDataSoft — CC BY 4.0
+  (`georef-netherlands-postcode-pc4`)
+- Provinciegrenzen: **Kadaster** via OpenDataSoft — CC0 1.0
+  (`georef-netherlands-provincie`, meegeleverd in `src/postcodejager/data/provinces.geojson`)
+- Kaarttegels: **CARTO** basemaps · © **OpenStreetMap**-bijdragers
+- Routing: **BRouter** op **OpenStreetMap**-data (ODbL)
+- Activiteiten: **Strava** (scope `activity:read_all`, alleen je eigen data) —
+  onder de Strava API Agreement en merkrichtlijnen

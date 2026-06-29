@@ -32,7 +32,7 @@ from .strava import StravaClient, build_authorize_url
 logger = logging.getLogger("postcodejager")
 
 STATIC_DIR = pathlib.Path(__file__).parent / "static"
-# Official CBS province boundaries (CC BY 4.0), bundled with the package.
+# Province boundaries (Kadaster, CC0) from OpenDataSoft, bundled with the package.
 PROVINCE_GEOJSON = pathlib.Path(__file__).parent / "data" / "provinces.geojson"
 # Degrees of geometry simplification for the display layer (~100 m).
 DISPLAY_SIMPLIFY = 0.001

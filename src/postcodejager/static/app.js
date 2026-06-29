@@ -54,18 +54,20 @@ const map = L.map("map", {
   minZoom: 7,
 }).setView([52.1, 5.1], 8);
 
-// CARTO basemaps: clean, free, no API key. Swap "voyager" for positron /
-// dark_matter to change the look. https://leaflet-extras.github.io/leaflet-providers/preview/
-L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
-  {
-    subdomains: "abcd",
-    maxZoom: 20,
-    bounds: NL_BOUNDS,
+// Self-hosted Protomaps vector basemap (one .pmtiles file we serve at
+// /basemap/nl.pmtiles). protomaps-leaflet reads the archive via HTTP range and
+// renders labels itself — no glyph/sprite hosting. Flavor "light" ≈ the old
+// CARTO Voyager look; overzooms past the native z15.
+protomapsL
+  .leafletLayer({
+    url: "/basemap/nl.pmtiles",
+    flavor: "light",
+    lang: "nl",
     attribution:
-      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>, © <a href="https://carto.com/attributions">CARTO</a>',
-  }
-).addTo(map);
+      '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-bijdragers · ' +
+      '<a href="https://protomaps.com">Protomaps</a>',
+  })
+  .addTo(map);
 
 // Dedicated pane so the computed route always draws above the postcode polygons
 // (overlayPane, z 400) yet below the markers/handles (markerPane, z 600) — no

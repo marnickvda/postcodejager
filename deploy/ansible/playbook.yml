@@ -14,6 +14,8 @@
     strava_client_secret: "{{ strava_client_secret }}"
     brouter_base_url: "https://brouter.de/brouter"
     brouter_profile: "trekking"
+    pmtiles_version: "1.30.3"  # latest from github.com/protomaps/go-pmtiles/releases
+    basemap_planet_url: "{{ basemap_planet_url | default('') }}"  # a build from maps.protomaps.com/builds
 
   handlers:
     - name: restart app
@@ -125,11 +127,28 @@
         state: directory
         mode: "0755"
 
+    - name: Install the pmtiles CLI
+      ansible.builtin.unarchive:
+        src: "https://github.com/protomaps/go-pmtiles/releases/download/v{{ pmtiles_version }}/go-pmtiles_{{ pmtiles_version }}_Linux_x86_64.tar.gz"
+        dest: /usr/local/bin
+        remote_src: true
+        include:
+          - pmtiles
+        mode: "0755"
+        creates: /usr/local/bin/pmtiles
+
     - name: Fetch PC4 data (once)
       ansible.builtin.command:
         cmd: "{{ app_dir }}/.venv/bin/python scripts/fetch_pc4.py"
         chdir: "{{ app_dir }}"
         creates: "{{ app_dir }}/data/pc4.geojson"
+
+    - name: Fetch the Protomaps basemap (once)
+      ansible.builtin.command:
+        cmd: "{{ app_dir }}/.venv/bin/python scripts/fetch_basemap.py {{ basemap_planet_url }}"
+        chdir: "{{ app_dir }}"
+        creates: "{{ app_dir }}/data/nl.pmtiles"
+      when: basemap_planet_url | length > 0
 
     # Code, venv and .env stay root-owned: the service only reads them and
     # systemd loads EnvironmentFile as root. The app writes nothing today, but
